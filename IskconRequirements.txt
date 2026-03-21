@@ -1,0 +1,62 @@
+1.  Goal :  To create an app for managing Iskcon students 
+
+
+  User Requirements:
+  1. To maintain the data of ISKCON Students.
+  2. to enroll New Users/ Students in platform
+  3. To enable CRUD and manitaince of different sessions of class Types and the classes which will happen in each session.
+  
+  4. To maintain and  view attendance of ISKCON Students enrolled Students based on different classes.
+  5. To maintain different level of authorizations
+  
+
+
+
+
+
+...........
+4. There will be two schemas:
+
+Here is the fomat of following details for your reference:
+     
+Schema :(Schema Objective)
+ Table: ColNames: table Objective with cols explainaton for few cols and  with example possible vals
+
+
+
+
+User:
+
+1. users : ID , Name, Role(Admin, Managers , Students),isBACEDevotee, JoinedDate, isActive (any extra detail),MemberTypeID, enrolledBY, MentorID:  Purpose is to manage Members and to have data.
+2. MemberType: ID, MemberTypeName: To store which type of members (BYC, DYC, Brahmachari, Temple President...etc)
+3. WebsiteRoles : ID , Name, viewAdmin, removeUser, addUser, markAttendance, assignTasks, updateSeva, addSeva: Purpose is to authorize users based on different roles for website
+3. IskconRoles: ID , 
+
+
+
+
+
+Classes: Context: There are multiple classes going on , so to maintiain attendance of users, classes  types and there session no : so to find which user attended which classes of class type in which session : 
+
+2. Classes: ID, ClassesType, ClassDescription,  SessionID, isActive, StartDate, EndDate, Duration(in Days), DurationType(Permanent, Temporary, SingleDay), ClassInstructor, Remarks, timestamp
+3. ClassType: ID, ClassType, currentActiveSession: (BYC, DYC, VaisnavaEttiquets, ): The class types will be added by people. and each of them can have different sessions going on yearly/monthly basis which user will add
+4. ClassSessions: ID, ClassTypeID, SessionID,SessionName, StartDate, EndDate, SessionIncharge, TotalEnrolled, TotalClasses: to maintain sessions of different class types , Session ID will be incremented for that classType , when user will add a new session: TotalClasses will get incremented 
+5. SessionEnrollments: ID,ClassTypeID, SessionID, userID, EnrolledByUserID, StartDate, EndDate, Timestamp: Table will store user details for particular classType and session  Timestamp represents when that record is created and start date and enddate is for session which will be filled by user 
+
+2. ClassAttendance: ID, ClassID,ClassTypeID,  SessionID, UserID, Attended (boolean yes/no): MarkedByUser: For each of the Classes of a classType of a session to mark attendance of user
+
+
+
+
+
+BACE:
+
+1. BACE: BACEId, BACEName, Location, LocationURL, BACEHead, isBACEPermanentDevotee
+2. BACEDevotees: ID, UserID, UserName, IsActiveMember, isHead, isManager
+3. BACEREsidents: ID, UserID, UserName, isActiveMember, StartDate, EndDate, 
+
+
+Seva:
+
+1. Sevas: ID, SevaName, SevaTypeID, isActive, StartDate, EndDate, isPermanent : To maintain the different type of Seva Details such as Japa(Personal), BookDistribution, Temple Cleaning, etc(Can be Personal )
+2. SevaTypes: (ID, SevaTypeName):To maintatain different sevatypes(Personal), ToMaintain 

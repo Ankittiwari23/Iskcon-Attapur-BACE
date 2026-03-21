@@ -1,0 +1,14 @@
+
+For Managers
+Follow up: List
+For classes  yes / no / out of station / Busy/ DNPC 
+
+
+For admins : classes  Create : Followup 
+
+FollowUpList and Attendance List relation 
+
+After ! month : Manager will take report 
+
+Attendance :
+

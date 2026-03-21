@@ -1,0 +1,243 @@
+Session View:
+
+
+There should be separate session ID and Session Count: IN UI we will represent session count when user will select the class Type. 
+So that he will get meaningful information 
+
+No need of Sesision # ID but Need Sessiopn NO 
+
+
+
+Start Date and ENd Date should be properly shown 
+
+
+...........
+
+Class View:
+
+In Classes I am Getting very bad view 
+
+CLass ID Shouldnt be shown but in above filter first user shoyld select a class type name and then session and then only the c;lasses dshould be shown '
+
+in main table only Class No, Description Instructor Duration , Active, Actiopmn Should be shown 
+
+IN DB have Class ID separately but Class No also which will be based on the session it is in 
+like which no 
+So it will be earier for user to identify '
+
+Remove CLass Duration and keep it single day only in db also and in UI also 
+
+.....
+
+
+Similiarly in Attendance section  also, 
+First compulsory no data to be shown 'in table first user should select the type , session name, Date filter should be shown  in filter 
+So Based on that 
+
+We will show Student who were enrolled and the to mark attendance i n same page itself,
+
+For marking attendance there should be select mulytiple all , mark present / absent with update buttoin compulsory and camncel to reject changes .
+
+
+
+.....
+
+
+ENrollments section Save button show loading spinner in evry oither forms 
+
+FIrst Filter should be shown above and then only the table should be visible 
+filter of Type and then session should be shown And tablke should be shorted at desc order of enrolled at .
+Table should have Student Strt/End ENrolled At  Enrolled By User Name and Actions 
+
+
+.......
+Filters section in everyPage should be uniformly gatrhered space 
+Current problem the filter boxes are expanding and contracting based on the size of name but it should show like .... at the end if the space is increasing too much 
+
+
+......
+
+In user Info in neon postgre
+Add email , phone no also 
+
+......
+
+Add Clerk based Authentication
+Type ONly SIGNIN : NO SIGNUP
+
+with user email details in The db 
+First Give the plan only and then we will move ahead
+
+......
+
+
+
+
+Watching for users
+Sign up as your first user
+Install the SDK, run your dev server, and sign yourself up. The moment we detect that first account, installation is complete.
+Next.js
+Next.js
+React
+React
+TanStack Start
+TanStack Start
+Expo
+Expo
+iOS
+iOS
+JavaScript
+JavaScript
+Astro
+Astro
+React Router
+React Router
+Next.js
+Next.js
+(Pages Router)
+Remix
+Remix
+Express
+Express
+Nuxt
+Nuxt
+Vue
+Vue
+Android
+Android
+
+Note
+
+Clerk also provides a React Router SDK. See the quickstart in the Clerk Docs.
+
+Copy this quickstart guide as a prompt for LLMs to implement Clerk in your React application.
+1
+Create a new React app
+Run the following commands to create a new React app using Vite:
+npm
+pnpm
+yarn
+bun
+terminal
+npm create vite@latest clerk-react -- --template react-ts
+cd clerk-react
+npm install
+2
+Install @clerk/clerk-react
+The Clerk React SDK gives you access to prebuilt components, hooks, and helpers to make user authentication easier.
+
+Run the following command to install the SDK:
+
+npm
+pnpm
+yarn
+bun
+terminal
+npm install @clerk/clerk-react
+3
+Set your Clerk API keys
+Add your Clerk Publishable Key to your .env or create the file if it doesn't exist. Retrieve this key anytime from the API keys page.
+
+.env
+VITE_CLERK_PUBLISHABLE_KEY=pk_test_d2VsbC13aWxkY2F0LTExLmNsZXJrLmFjY291bnRzLmRldiQ
+4
+Import the Clerk Publishable Key
+
+In your main.tsx file, import your Clerk Publishable Key. You can add an if statement to check that it is imported and that it exists. This will prevent running the app without the Publishable Key, and will also prevent TypeScript errors.
+
+src/main.tsx
+import { StrictMode } from 'react'
+import { createRoot } from 'react-dom/client'
+import './index.css'
+import App from './App.tsx'
+
+// Import your Publishable Key
+const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY
+
+if (!PUBLISHABLE_KEY) {
+  throw new Error('Add your Clerk Publishable Key to the .env file')
+}
+
+createRoot(document.getElementById('root')!).render(
+  <StrictMode>
+    <App />
+  </StrictMode>,
+)
+5
+Add ClerkProvider to your app
+
+The ClerkProvidercomponent provides session and user context to Clerk's hooks and components. It's recommended to wrap your entire app at the entry point with ClerkProvider to make authentication globally accessible. See the reference docs for other configuration options.
+
+Pass your Publishable Key as a prop to the component, as shown in the following example:
+
+src/main.tsx
+import { StrictMode } from 'react'
+import { createRoot } from 'react-dom/client'
+import './index.css'
+import App from './App.tsx'
+import { ClerkProvider } from '@clerk/clerk-react'
+
+// Import your Publishable Key
+const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY
+
+if (!PUBLISHABLE_KEY) {
+  throw new Error('Add your Clerk Publishable Key to the .env file')
+}
+
+createRoot(document.getElementById('root')!).render(
+  <StrictMode>
+    <ClerkProvider publishableKey={PUBLISHABLE_KEY}>
+      <App />
+    </ClerkProvider>
+  </StrictMode>,
+)
+6
+Create a header with Clerk components
+
+You can control which content signed-in and signed-out users can see with Clerk's prebuilt control components. The following example creates a header using the following components:
+
+<SignedIn />: Children of this component can only be seen while signed in.
+<SignedOut />: Children of this component can only be seen while signed out.
+<UserButton />: Shows the signed-in user's avatar. Selecting it opens a dropdown menu with account management options.
+<SignInButton />: An unstyled component that links to the sign-in page or displays the sign-in modal. In this example, since no props or environment variables are set for the sign-in URL, this component links to the Account Portal sign-in page.
+<SignUpButton />: An unstyled component that links to the sign-up page or displays the sign-up modal. In this example, since no props or environment variables are set for the sign-up URL, this component links to the Account Portal sign-up page.
+src/App.tsx
+import './App.css'
+import { SignedIn, SignedOut, SignInButton, SignUpButton, UserButton } from '@clerk/clerk-react';
+
+function App() {
+  return (
+    <header>
+      {/* Show the sign-in and sign-up buttons when the user is signed out */}
+      <SignedOut>
+        <SignInButton />
+        <SignUpButton />
+      </SignedOut>
+      {/* Show the user button when the user is signed in */}
+      <SignedIn>
+        <UserButton />
+      </SignedIn>
+    </header>
+  );
+}
+
+export default App
+Run your project
+Run your project with the following command:
+
+npm
+pnpm
+yarn
+bun
+terminal
+npm run dev
+Create your first user
+Visit your app's homepage at http://localhost:5173 and select "Sign up" on the page to create your first user.
+
+Next steps
+
+Add routing with React Router
+React Router supports three different routing strategies, or modes. The declarative mode is the easiest way to get started. It enables basic routing features like matching URLs to components, navigating around the app, and providing active states with APIs like <Link />, useNavigate(), and useLocation().
+
+
+

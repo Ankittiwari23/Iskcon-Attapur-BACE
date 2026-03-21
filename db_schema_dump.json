@@ -1,0 +1,1334 @@
+{
+  "ClassAttendance": {
+    "columns": [
+      {
+        "name": "id",
+        "type": "integer",
+        "nullable": "NO",
+        "default": "nextval('\"ClassAttendance_id_seq\"'::regclass)",
+        "max_length": null,
+        "numeric_precision": 32
+      },
+      {
+        "name": "ClassID",
+        "type": "integer",
+        "nullable": "NO",
+        "default": null,
+        "max_length": null,
+        "numeric_precision": 32
+      },
+      {
+        "name": "ClassTypeID",
+        "type": "integer",
+        "nullable": "NO",
+        "default": null,
+        "max_length": null,
+        "numeric_precision": 32
+      },
+      {
+        "name": "SessionID",
+        "type": "integer",
+        "nullable": "NO",
+        "default": null,
+        "max_length": null,
+        "numeric_precision": 32
+      },
+      {
+        "name": "UserID",
+        "type": "integer",
+        "nullable": "NO",
+        "default": null,
+        "max_length": null,
+        "numeric_precision": 32
+      },
+      {
+        "name": "Attended",
+        "type": "boolean",
+        "nullable": "NO",
+        "default": "false",
+        "max_length": null,
+        "numeric_precision": null
+      },
+      {
+        "name": "MarkedByUser",
+        "type": "integer",
+        "nullable": "YES",
+        "default": null,
+        "max_length": null,
+        "numeric_precision": 32
+      },
+      {
+        "name": "MarkedAt",
+        "type": "timestamp with time zone",
+        "nullable": "YES",
+        "default": "now()",
+        "max_length": null,
+        "numeric_precision": null
+      }
+    ],
+    "primary_keys": [
+      "id"
+    ],
+    "foreign_keys": [
+      {
+        "column": "ClassID",
+        "references_table": "Classes",
+        "references_column": "id"
+      },
+      {
+        "column": "UserID",
+        "references_table": "users",
+        "references_column": "id"
+      },
+      {
+        "column": "MarkedByUser",
+        "references_table": "users",
+        "references_column": "id"
+      },
+      {
+        "column": "ClassTypeID",
+        "references_table": "ClassSessions",
+        "references_column": "ClassTypeID"
+      },
+      {
+        "column": "ClassTypeID",
+        "references_table": "ClassSessions",
+        "references_column": "SessionID"
+      },
+      {
+        "column": "SessionID",
+        "references_table": "ClassSessions",
+        "references_column": "ClassTypeID"
+      },
+      {
+        "column": "SessionID",
+        "references_table": "ClassSessions",
+        "references_column": "SessionID"
+      }
+    ],
+    "unique_constraints": [
+      [
+        "ClassID",
+        "UserID"
+      ]
+    ],
+    "check_constraints": [
+      "id IS NOT NULL",
+      "ClassID IS NOT NULL",
+      "ClassTypeID IS NOT NULL",
+      "SessionID IS NOT NULL",
+      "UserID IS NOT NULL",
+      "Attended IS NOT NULL"
+    ],
+    "indexes": [
+      {
+        "name": "ClassAttendance_pkey",
+        "definition": "CREATE UNIQUE INDEX \"ClassAttendance_pkey\" ON public.\"ClassAttendance\" USING btree (id)"
+      },
+      {
+        "name": "ClassAttendance_ClassID_UserID_key",
+        "definition": "CREATE UNIQUE INDEX \"ClassAttendance_ClassID_UserID_key\" ON public.\"ClassAttendance\" USING btree (\"ClassID\", \"UserID\")"
+      },
+      {
+        "name": "idx_attendance_class_user",
+        "definition": "CREATE INDEX idx_attendance_class_user ON public.\"ClassAttendance\" USING btree (\"ClassID\", \"UserID\")"
+      }
+    ],
+    "sample_row": {
+      "id": 1,
+      "ClassID": 4,
+      "ClassTypeID": 4,
+      "SessionID": 1,
+      "UserID": 6,
+      "Attended": true,
+      "MarkedByUser": null,
+      "MarkedAt": "2026-02-21T19:56:28.868890+00:00"
+    }
+  },
+  "ClassSessions": {
+    "columns": [
+      {
+        "name": "id",
+        "type": "integer",
+        "nullable": "NO",
+        "default": "nextval('\"ClassSessions_id_seq\"'::regclass)",
+        "max_length": null,
+        "numeric_precision": 32
+      },
+      {
+        "name": "ClassTypeID",
+        "type": "integer",
+        "nullable": "NO",
+        "default": null,
+        "max_length": null,
+        "numeric_precision": 32
+      },
+      {
+        "name": "SessionID",
+        "type": "integer",
+        "nullable": "NO",
+        "default": null,
+        "max_length": null,
+        "numeric_precision": 32
+      },
+      {
+        "name": "SessionName",
+        "type": "character varying",
+        "nullable": "NO",
+        "default": null,
+        "max_length": 200,
+        "numeric_precision": null
+      },
+      {
+        "name": "StartDate",
+        "type": "date",
+        "nullable": "YES",
+        "default": null,
+        "max_length": null,
+        "numeric_precision": null
+      },
+      {
+        "name": "EndDate",
+        "type": "date",
+        "nullable": "YES",
+        "default": null,
+        "max_length": null,
+        "numeric_precision": null
+      },
+      {
+        "name": "TotalEnrolled",
+        "type": "integer",
+        "nullable": "YES",
+        "default": "0",
+        "max_length": null,
+        "numeric_precision": 32
+      },
+      {
+        "name": "TotalClasses",
+        "type": "integer",
+        "nullable": "YES",
+        "default": "0",
+        "max_length": null,
+        "numeric_precision": 32
+      },
+      {
+        "name": "SessionIncharge",
+        "type": "integer",
+        "nullable": "YES",
+        "default": null,
+        "max_length": null,
+        "numeric_precision": 32
+      }
+    ],
+    "primary_keys": [
+      "id"
+    ],
+    "foreign_keys": [
+      {
+        "column": "ClassTypeID",
+        "references_table": "ClassType",
+        "references_column": "id"
+      },
+      {
+        "column": "SessionIncharge",
+        "references_table": "users",
+        "references_column": "id"
+      }
+    ],
+    "unique_constraints": [
+      [
+        "ClassTypeID",
+        "SessionID"
+      ]
+    ],
+    "check_constraints": [
+      "id IS NOT NULL",
+      "ClassTypeID IS NOT NULL",
+      "SessionID IS NOT NULL",
+      "SessionName IS NOT NULL"
+    ],
+    "indexes": [
+      {
+        "name": "ClassSessions_pkey",
+        "definition": "CREATE UNIQUE INDEX \"ClassSessions_pkey\" ON public.\"ClassSessions\" USING btree (id)"
+      },
+      {
+        "name": "ClassSessions_ClassTypeID_SessionID_key",
+        "definition": "CREATE UNIQUE INDEX \"ClassSessions_ClassTypeID_SessionID_key\" ON public.\"ClassSessions\" USING btree (\"ClassTypeID\", \"SessionID\")"
+      }
+    ],
+    "sample_row": {
+      "id": 4,
+      "ClassTypeID": 5,
+      "SessionID": 1,
+      "SessionName": "BG_Classes_2025-26",
+      "StartDate": "2025-01-01",
+      "EndDate": "2026-03-08",
+      "TotalEnrolled": 0,
+      "TotalClasses": 0,
+      "SessionIncharge": null
+    }
+  },
+  "ClassType": {
+    "columns": [
+      {
+        "name": "id",
+        "type": "integer",
+        "nullable": "NO",
+        "default": "nextval('\"ClassType_id_seq\"'::regclass)",
+        "max_length": null,
+        "numeric_precision": 32
+      },
+      {
+        "name": "ClassType",
+        "type": "character varying",
+        "nullable": "NO",
+        "default": null,
+        "max_length": 100,
+        "numeric_precision": null
+      },
+      {
+        "name": "currentActiveSession",
+        "type": "integer",
+        "nullable": "YES",
+        "default": "1",
+        "max_length": null,
+        "numeric_precision": 32
+      }
+    ],
+    "primary_keys": [
+      "id"
+    ],
+    "foreign_keys": [],
+    "unique_constraints": [
+      [
+        "ClassType"
+      ]
+    ],
+    "check_constraints": [
+      "id IS NOT NULL",
+      "ClassType IS NOT NULL"
+    ],
+    "indexes": [
+      {
+        "name": "ClassType_pkey",
+        "definition": "CREATE UNIQUE INDEX \"ClassType_pkey\" ON public.\"ClassType\" USING btree (id)"
+      },
+      {
+        "name": "ClassType_ClassType_key",
+        "definition": "CREATE UNIQUE INDEX \"ClassType_ClassType_key\" ON public.\"ClassType\" USING btree (\"ClassType\")"
+      }
+    ],
+    "sample_row": {
+      "id": 5,
+      "ClassType": "Sunday Evening Classes",
+      "currentActiveSession": 1
+    }
+  },
+  "Classes": {
+    "columns": [
+      {
+        "name": "id",
+        "type": "integer",
+        "nullable": "NO",
+        "default": "nextval('\"Classes_id_seq\"'::regclass)",
+        "max_length": null,
+        "numeric_precision": 32
+      },
+      {
+        "name": "ClassTypeID",
+        "type": "integer",
+        "nullable": "NO",
+        "default": null,
+        "max_length": null,
+        "numeric_precision": 32
+      },
+      {
+        "name": "SessionID",
+        "type": "integer",
+        "nullable": "NO",
+        "default": null,
+        "max_length": null,
+        "numeric_precision": 32
+      },
+      {
+        "name": "ClassDescription",
+        "type": "text",
+        "nullable": "YES",
+        "default": null,
+        "max_length": null,
+        "numeric_precision": null
+      },
+      {
+        "name": "isActive",
+        "type": "boolean",
+        "nullable": "YES",
+        "default": "true",
+        "max_length": null,
+        "numeric_precision": null
+      },
+      {
+        "name": "StartDate",
+        "type": "date",
+        "nullable": "YES",
+        "default": null,
+        "max_length": null,
+        "numeric_precision": null
+      },
+      {
+        "name": "EndDate",
+        "type": "date",
+        "nullable": "YES",
+        "default": null,
+        "max_length": null,
+        "numeric_precision": null
+      },
+      {
+        "name": "Duration",
+        "type": "integer",
+        "nullable": "YES",
+        "default": "1",
+        "max_length": null,
+        "numeric_precision": 32
+      },
+      {
+        "name": "DurationType",
+        "type": "character varying",
+        "nullable": "YES",
+        "default": "'SingleDay'::character varying",
+        "max_length": 20,
+        "numeric_precision": null
+      },
+      {
+        "name": "Remarks",
+        "type": "text",
+        "nullable": "YES",
+        "default": null,
+        "max_length": null,
+        "numeric_precision": null
+      },
+      {
+        "name": "createdAt",
+        "type": "timestamp with time zone",
+        "nullable": "YES",
+        "default": "now()",
+        "max_length": null,
+        "numeric_precision": null
+      },
+      {
+        "name": "ClassInstructor",
+        "type": "integer",
+        "nullable": "YES",
+        "default": null,
+        "max_length": null,
+        "numeric_precision": 32
+      }
+    ],
+    "primary_keys": [
+      "id"
+    ],
+    "foreign_keys": [
+      {
+        "column": "ClassTypeID",
+        "references_table": "ClassType",
+        "references_column": "id"
+      },
+      {
+        "column": "ClassTypeID",
+        "references_table": "ClassSessions",
+        "references_column": "ClassTypeID"
+      },
+      {
+        "column": "ClassTypeID",
+        "references_table": "ClassSessions",
+        "references_column": "SessionID"
+      },
+      {
+        "column": "SessionID",
+        "references_table": "ClassSessions",
+        "references_column": "ClassTypeID"
+      },
+      {
+        "column": "SessionID",
+        "references_table": "ClassSessions",
+        "references_column": "SessionID"
+      },
+      {
+        "column": "ClassInstructor",
+        "references_table": "users",
+        "references_column": "id"
+      }
+    ],
+    "unique_constraints": [],
+    "check_constraints": [
+      "((\"DurationType\")::text = 'SingleDay'::text)",
+      "id IS NOT NULL",
+      "ClassTypeID IS NOT NULL",
+      "SessionID IS NOT NULL"
+    ],
+    "indexes": [
+      {
+        "name": "Classes_pkey",
+        "definition": "CREATE UNIQUE INDEX \"Classes_pkey\" ON public.\"Classes\" USING btree (id)"
+      },
+      {
+        "name": "idx_classes_session",
+        "definition": "CREATE INDEX idx_classes_session ON public.\"Classes\" USING btree (\"ClassTypeID\", \"SessionID\")"
+      }
+    ],
+    "sample_row": {
+      "id": 5,
+      "ClassTypeID": 4,
+      "SessionID": 3,
+      "ClassDescription": "Bhagwat Geeta Classes",
+      "isActive": true,
+      "StartDate": "2026-02-08",
+      "EndDate": "2026-02-08",
+      "Duration": 1,
+      "DurationType": "SingleDay",
+      "Remarks": null,
+      "createdAt": "2026-02-08T08:01:36.364998+00:00",
+      "ClassInstructor": 2
+    }
+  },
+  "EnrollmentInvites": {
+    "columns": [
+      {
+        "name": "id",
+        "type": "integer",
+        "nullable": "NO",
+        "default": "nextval('\"EnrollmentInvites_id_seq\"'::regclass)",
+        "max_length": null,
+        "numeric_precision": 32
+      },
+      {
+        "name": "Token",
+        "type": "character varying",
+        "nullable": "NO",
+        "default": null,
+        "max_length": 64,
+        "numeric_precision": null
+      },
+      {
+        "name": "ClassTypeID",
+        "type": "integer",
+        "nullable": "NO",
+        "default": null,
+        "max_length": null,
+        "numeric_precision": 32
+      },
+      {
+        "name": "SessionID",
+        "type": "integer",
+        "nullable": "NO",
+        "default": null,
+        "max_length": null,
+        "numeric_precision": 32
+      },
+      {
+        "name": "CreatedByID",
+        "type": "integer",
+        "nullable": "NO",
+        "default": null,
+        "max_length": null,
+        "numeric_precision": 32
+      },
+      {
+        "name": "ExpiresAt",
+        "type": "timestamp with time zone",
+        "nullable": "NO",
+        "default": null,
+        "max_length": null,
+        "numeric_precision": null
+      },
+      {
+        "name": "IsActive",
+        "type": "boolean",
+        "nullable": "YES",
+        "default": "true",
+        "max_length": null,
+        "numeric_precision": null
+      },
+      {
+        "name": "createdAt",
+        "type": "timestamp with time zone",
+        "nullable": "YES",
+        "default": "now()",
+        "max_length": null,
+        "numeric_precision": null
+      }
+    ],
+    "primary_keys": [
+      "id"
+    ],
+    "foreign_keys": [
+      {
+        "column": "ClassTypeID",
+        "references_table": "ClassType",
+        "references_column": "id"
+      },
+      {
+        "column": "CreatedByID",
+        "references_table": "users",
+        "references_column": "id"
+      },
+      {
+        "column": "ClassTypeID",
+        "references_table": "ClassSessions",
+        "references_column": "ClassTypeID"
+      },
+      {
+        "column": "ClassTypeID",
+        "references_table": "ClassSessions",
+        "references_column": "SessionID"
+      },
+      {
+        "column": "SessionID",
+        "references_table": "ClassSessions",
+        "references_column": "ClassTypeID"
+      },
+      {
+        "column": "SessionID",
+        "references_table": "ClassSessions",
+        "references_column": "SessionID"
+      }
+    ],
+    "unique_constraints": [
+      [
+        "Token"
+      ]
+    ],
+    "check_constraints": [
+      "id IS NOT NULL",
+      "Token IS NOT NULL",
+      "ClassTypeID IS NOT NULL",
+      "SessionID IS NOT NULL",
+      "CreatedByID IS NOT NULL",
+      "ExpiresAt IS NOT NULL"
+    ],
+    "indexes": [
+      {
+        "name": "EnrollmentInvites_pkey",
+        "definition": "CREATE UNIQUE INDEX \"EnrollmentInvites_pkey\" ON public.\"EnrollmentInvites\" USING btree (id)"
+      },
+      {
+        "name": "EnrollmentInvites_Token_key",
+        "definition": "CREATE UNIQUE INDEX \"EnrollmentInvites_Token_key\" ON public.\"EnrollmentInvites\" USING btree (\"Token\")"
+      },
+      {
+        "name": "idx_invite_token",
+        "definition": "CREATE INDEX idx_invite_token ON public.\"EnrollmentInvites\" USING btree (\"Token\")"
+      }
+    ],
+    "sample_row": {
+      "id": 1,
+      "Token": "5a5b0b1d2d2e6be4dbf8abdb5addc1ee5450069e5d2335410d25d87808225b4c",
+      "ClassTypeID": 6,
+      "SessionID": 1,
+      "CreatedByID": 2,
+      "ExpiresAt": "2026-02-22T22:39:27.449000+00:00",
+      "IsActive": true,
+      "createdAt": "2026-02-21T22:39:45.441741+00:00"
+    }
+  },
+  "IskconRoles": {
+    "columns": [
+      {
+        "name": "id",
+        "type": "integer",
+        "nullable": "NO",
+        "default": "nextval('\"IskconRoles_id_seq\"'::regclass)",
+        "max_length": null,
+        "numeric_precision": 32
+      },
+      {
+        "name": "Designation",
+        "type": "character varying",
+        "nullable": "NO",
+        "default": null,
+        "max_length": 100,
+        "numeric_precision": null
+      }
+    ],
+    "primary_keys": [
+      "id"
+    ],
+    "foreign_keys": [],
+    "unique_constraints": [],
+    "check_constraints": [
+      "id IS NOT NULL",
+      "Designation IS NOT NULL"
+    ],
+    "indexes": [
+      {
+        "name": "IskconRoles_pkey",
+        "definition": "CREATE UNIQUE INDEX \"IskconRoles_pkey\" ON public.\"IskconRoles\" USING btree (id)"
+      }
+    ],
+    "sample_row": null
+  },
+  "MemberType": {
+    "columns": [
+      {
+        "name": "id",
+        "type": "integer",
+        "nullable": "NO",
+        "default": "nextval('\"MemberType_id_seq\"'::regclass)",
+        "max_length": null,
+        "numeric_precision": 32
+      },
+      {
+        "name": "MemberTypeName",
+        "type": "character varying",
+        "nullable": "NO",
+        "default": null,
+        "max_length": 100,
+        "numeric_precision": null
+      }
+    ],
+    "primary_keys": [
+      "id"
+    ],
+    "foreign_keys": [],
+    "unique_constraints": [
+      [
+        "MemberTypeName"
+      ]
+    ],
+    "check_constraints": [
+      "id IS NOT NULL",
+      "MemberTypeName IS NOT NULL"
+    ],
+    "indexes": [
+      {
+        "name": "MemberType_pkey",
+        "definition": "CREATE UNIQUE INDEX \"MemberType_pkey\" ON public.\"MemberType\" USING btree (id)"
+      },
+      {
+        "name": "MemberType_MemberTypeName_key",
+        "definition": "CREATE UNIQUE INDEX \"MemberType_MemberTypeName_key\" ON public.\"MemberType\" USING btree (\"MemberTypeName\")"
+      }
+    ],
+    "sample_row": {
+      "id": 1,
+      "MemberTypeName": "BYC"
+    }
+  },
+  "PendingEnrollments": {
+    "columns": [
+      {
+        "name": "id",
+        "type": "integer",
+        "nullable": "NO",
+        "default": "nextval('\"PendingEnrollments_id_seq\"'::regclass)",
+        "max_length": null,
+        "numeric_precision": 32
+      },
+      {
+        "name": "InviteID",
+        "type": "integer",
+        "nullable": "NO",
+        "default": null,
+        "max_length": null,
+        "numeric_precision": 32
+      },
+      {
+        "name": "ClassTypeID",
+        "type": "integer",
+        "nullable": "NO",
+        "default": null,
+        "max_length": null,
+        "numeric_precision": 32
+      },
+      {
+        "name": "SessionID",
+        "type": "integer",
+        "nullable": "NO",
+        "default": null,
+        "max_length": null,
+        "numeric_precision": 32
+      },
+      {
+        "name": "Name",
+        "type": "character varying",
+        "nullable": "NO",
+        "default": null,
+        "max_length": 200,
+        "numeric_precision": null
+      },
+      {
+        "name": "Age",
+        "type": "integer",
+        "nullable": "YES",
+        "default": null,
+        "max_length": null,
+        "numeric_precision": 32
+      },
+      {
+        "name": "Email",
+        "type": "character varying",
+        "nullable": "YES",
+        "default": null,
+        "max_length": 200,
+        "numeric_precision": null
+      },
+      {
+        "name": "Phone",
+        "type": "character varying",
+        "nullable": "YES",
+        "default": null,
+        "max_length": 20,
+        "numeric_precision": null
+      },
+      {
+        "name": "Status",
+        "type": "character varying",
+        "nullable": "YES",
+        "default": "'pending'::character varying",
+        "max_length": 20,
+        "numeric_precision": null
+      },
+      {
+        "name": "ReviewedByID",
+        "type": "integer",
+        "nullable": "YES",
+        "default": null,
+        "max_length": null,
+        "numeric_precision": 32
+      },
+      {
+        "name": "ReviewedAt",
+        "type": "timestamp with time zone",
+        "nullable": "YES",
+        "default": null,
+        "max_length": null,
+        "numeric_precision": null
+      },
+      {
+        "name": "UserID",
+        "type": "integer",
+        "nullable": "YES",
+        "default": null,
+        "max_length": null,
+        "numeric_precision": 32
+      },
+      {
+        "name": "createdAt",
+        "type": "timestamp with time zone",
+        "nullable": "YES",
+        "default": "now()",
+        "max_length": null,
+        "numeric_precision": null
+      }
+    ],
+    "primary_keys": [
+      "id"
+    ],
+    "foreign_keys": [
+      {
+        "column": "InviteID",
+        "references_table": "EnrollmentInvites",
+        "references_column": "id"
+      },
+      {
+        "column": "ReviewedByID",
+        "references_table": "users",
+        "references_column": "id"
+      },
+      {
+        "column": "UserID",
+        "references_table": "users",
+        "references_column": "id"
+      },
+      {
+        "column": "ClassTypeID",
+        "references_table": "ClassSessions",
+        "references_column": "ClassTypeID"
+      },
+      {
+        "column": "ClassTypeID",
+        "references_table": "ClassSessions",
+        "references_column": "SessionID"
+      },
+      {
+        "column": "SessionID",
+        "references_table": "ClassSessions",
+        "references_column": "ClassTypeID"
+      },
+      {
+        "column": "SessionID",
+        "references_table": "ClassSessions",
+        "references_column": "SessionID"
+      }
+    ],
+    "unique_constraints": [],
+    "check_constraints": [
+      "((\"Status\")::text = ANY ((ARRAY['pending'::character varying, 'approved'::character varying, 'rejected'::character varying])::text[]))",
+      "id IS NOT NULL",
+      "InviteID IS NOT NULL",
+      "ClassTypeID IS NOT NULL",
+      "SessionID IS NOT NULL",
+      "Name IS NOT NULL"
+    ],
+    "indexes": [
+      {
+        "name": "PendingEnrollments_pkey",
+        "definition": "CREATE UNIQUE INDEX \"PendingEnrollments_pkey\" ON public.\"PendingEnrollments\" USING btree (id)"
+      },
+      {
+        "name": "idx_pending_status",
+        "definition": "CREATE INDEX idx_pending_status ON public.\"PendingEnrollments\" USING btree (\"Status\")"
+      },
+      {
+        "name": "idx_pending_invite",
+        "definition": "CREATE INDEX idx_pending_invite ON public.\"PendingEnrollments\" USING btree (\"InviteID\")"
+      }
+    ],
+    "sample_row": null
+  },
+  "SessionEnrollments": {
+    "columns": [
+      {
+        "name": "id",
+        "type": "integer",
+        "nullable": "NO",
+        "default": "nextval('\"SessionEnrollments_id_seq\"'::regclass)",
+        "max_length": null,
+        "numeric_precision": 32
+      },
+      {
+        "name": "ClassTypeID",
+        "type": "integer",
+        "nullable": "NO",
+        "default": null,
+        "max_length": null,
+        "numeric_precision": 32
+      },
+      {
+        "name": "SessionID",
+        "type": "integer",
+        "nullable": "NO",
+        "default": null,
+        "max_length": null,
+        "numeric_precision": 32
+      },
+      {
+        "name": "userID",
+        "type": "integer",
+        "nullable": "NO",
+        "default": null,
+        "max_length": null,
+        "numeric_precision": 32
+      },
+      {
+        "name": "EnrolledByUserID",
+        "type": "integer",
+        "nullable": "YES",
+        "default": null,
+        "max_length": null,
+        "numeric_precision": 32
+      },
+      {
+        "name": "StartDate",
+        "type": "date",
+        "nullable": "YES",
+        "default": null,
+        "max_length": null,
+        "numeric_precision": null
+      },
+      {
+        "name": "EndDate",
+        "type": "date",
+        "nullable": "YES",
+        "default": null,
+        "max_length": null,
+        "numeric_precision": null
+      },
+      {
+        "name": "createdAt",
+        "type": "timestamp with time zone",
+        "nullable": "YES",
+        "default": "now()",
+        "max_length": null,
+        "numeric_precision": null
+      }
+    ],
+    "primary_keys": [
+      "id"
+    ],
+    "foreign_keys": [
+      {
+        "column": "ClassTypeID",
+        "references_table": "ClassType",
+        "references_column": "id"
+      },
+      {
+        "column": "userID",
+        "references_table": "users",
+        "references_column": "id"
+      },
+      {
+        "column": "EnrolledByUserID",
+        "references_table": "users",
+        "references_column": "id"
+      },
+      {
+        "column": "ClassTypeID",
+        "references_table": "ClassSessions",
+        "references_column": "ClassTypeID"
+      },
+      {
+        "column": "ClassTypeID",
+        "references_table": "ClassSessions",
+        "references_column": "SessionID"
+      },
+      {
+        "column": "SessionID",
+        "references_table": "ClassSessions",
+        "references_column": "ClassTypeID"
+      },
+      {
+        "column": "SessionID",
+        "references_table": "ClassSessions",
+        "references_column": "SessionID"
+      }
+    ],
+    "unique_constraints": [
+      [
+        "ClassTypeID",
+        "SessionID",
+        "userID"
+      ]
+    ],
+    "check_constraints": [
+      "id IS NOT NULL",
+      "ClassTypeID IS NOT NULL",
+      "SessionID IS NOT NULL",
+      "userID IS NOT NULL"
+    ],
+    "indexes": [
+      {
+        "name": "SessionEnrollments_pkey",
+        "definition": "CREATE UNIQUE INDEX \"SessionEnrollments_pkey\" ON public.\"SessionEnrollments\" USING btree (id)"
+      },
+      {
+        "name": "SessionEnrollments_ClassTypeID_SessionID_userID_key",
+        "definition": "CREATE UNIQUE INDEX \"SessionEnrollments_ClassTypeID_SessionID_userID_key\" ON public.\"SessionEnrollments\" USING btree (\"ClassTypeID\", \"SessionID\", \"userID\")"
+      },
+      {
+        "name": "idx_session_enrollments_user",
+        "definition": "CREATE INDEX idx_session_enrollments_user ON public.\"SessionEnrollments\" USING btree (\"userID\")"
+      }
+    ],
+    "sample_row": {
+      "id": 1,
+      "ClassTypeID": 4,
+      "SessionID": 2,
+      "userID": 5,
+      "EnrolledByUserID": 1,
+      "StartDate": "2026-02-08",
+      "EndDate": null,
+      "createdAt": "2026-02-07T18:40:17.190665+00:00"
+    }
+  },
+  "WebsiteRoles": {
+    "columns": [
+      {
+        "name": "id",
+        "type": "integer",
+        "nullable": "NO",
+        "default": "nextval('\"WebsiteRoles_id_seq\"'::regclass)",
+        "max_length": null,
+        "numeric_precision": 32
+      },
+      {
+        "name": "Name",
+        "type": "character varying",
+        "nullable": "NO",
+        "default": null,
+        "max_length": 50,
+        "numeric_precision": null
+      },
+      {
+        "name": "viewAdmin",
+        "type": "boolean",
+        "nullable": "YES",
+        "default": "false",
+        "max_length": null,
+        "numeric_precision": null
+      },
+      {
+        "name": "removeUser",
+        "type": "boolean",
+        "nullable": "YES",
+        "default": "false",
+        "max_length": null,
+        "numeric_precision": null
+      },
+      {
+        "name": "addUser",
+        "type": "boolean",
+        "nullable": "YES",
+        "default": "false",
+        "max_length": null,
+        "numeric_precision": null
+      },
+      {
+        "name": "markAttendance",
+        "type": "boolean",
+        "nullable": "YES",
+        "default": "false",
+        "max_length": null,
+        "numeric_precision": null
+      },
+      {
+        "name": "assignTasks",
+        "type": "boolean",
+        "nullable": "YES",
+        "default": "false",
+        "max_length": null,
+        "numeric_precision": null
+      },
+      {
+        "name": "updateSeva",
+        "type": "boolean",
+        "nullable": "YES",
+        "default": "false",
+        "max_length": null,
+        "numeric_precision": null
+      },
+      {
+        "name": "addSeva",
+        "type": "boolean",
+        "nullable": "YES",
+        "default": "false",
+        "max_length": null,
+        "numeric_precision": null
+      }
+    ],
+    "primary_keys": [
+      "id"
+    ],
+    "foreign_keys": [],
+    "unique_constraints": [
+      [
+        "Name"
+      ]
+    ],
+    "check_constraints": [
+      "id IS NOT NULL",
+      "Name IS NOT NULL"
+    ],
+    "indexes": [
+      {
+        "name": "WebsiteRoles_pkey",
+        "definition": "CREATE UNIQUE INDEX \"WebsiteRoles_pkey\" ON public.\"WebsiteRoles\" USING btree (id)"
+      },
+      {
+        "name": "WebsiteRoles_Name_key",
+        "definition": "CREATE UNIQUE INDEX \"WebsiteRoles_Name_key\" ON public.\"WebsiteRoles\" USING btree (\"Name\")"
+      }
+    ],
+    "sample_row": {
+      "id": 1,
+      "Name": "Admin",
+      "viewAdmin": true,
+      "removeUser": true,
+      "addUser": true,
+      "markAttendance": true,
+      "assignTasks": true,
+      "updateSeva": true,
+      "addSeva": true
+    }
+  },
+  "users": {
+    "columns": [
+      {
+        "name": "id",
+        "type": "integer",
+        "nullable": "NO",
+        "default": "nextval('users_id_seq'::regclass)",
+        "max_length": null,
+        "numeric_precision": 32
+      },
+      {
+        "name": "Name",
+        "type": "character varying",
+        "nullable": "NO",
+        "default": null,
+        "max_length": 200,
+        "numeric_precision": null
+      },
+      {
+        "name": "Role",
+        "type": "character varying",
+        "nullable": "NO",
+        "default": null,
+        "max_length": 50,
+        "numeric_precision": null
+      },
+      {
+        "name": "isBACEDevotee",
+        "type": "boolean",
+        "nullable": "YES",
+        "default": "false",
+        "max_length": null,
+        "numeric_precision": null
+      },
+      {
+        "name": "JoinedDate",
+        "type": "date",
+        "nullable": "YES",
+        "default": null,
+        "max_length": null,
+        "numeric_precision": null
+      },
+      {
+        "name": "isActive",
+        "type": "boolean",
+        "nullable": "YES",
+        "default": "true",
+        "max_length": null,
+        "numeric_precision": null
+      },
+      {
+        "name": "MemberTypeID",
+        "type": "integer",
+        "nullable": "YES",
+        "default": null,
+        "max_length": null,
+        "numeric_precision": 32
+      },
+      {
+        "name": "enrolledBY",
+        "type": "integer",
+        "nullable": "YES",
+        "default": null,
+        "max_length": null,
+        "numeric_precision": 32
+      },
+      {
+        "name": "MentorID",
+        "type": "integer",
+        "nullable": "YES",
+        "default": null,
+        "max_length": null,
+        "numeric_precision": 32
+      },
+      {
+        "name": "WebsiteRoleID",
+        "type": "integer",
+        "nullable": "YES",
+        "default": null,
+        "max_length": null,
+        "numeric_precision": 32
+      },
+      {
+        "name": "createdAt",
+        "type": "timestamp with time zone",
+        "nullable": "YES",
+        "default": "now()",
+        "max_length": null,
+        "numeric_precision": null
+      },
+      {
+        "name": "Email",
+        "type": "character varying",
+        "nullable": "YES",
+        "default": null,
+        "max_length": 200,
+        "numeric_precision": null
+      },
+      {
+        "name": "Phone",
+        "type": "character varying",
+        "nullable": "YES",
+        "default": null,
+        "max_length": 20,
+        "numeric_precision": null
+      },
+      {
+        "name": "PasswordHash",
+        "type": "character varying",
+        "nullable": "YES",
+        "default": null,
+        "max_length": 255,
+        "numeric_precision": null
+      }
+    ],
+    "primary_keys": [
+      "id"
+    ],
+    "foreign_keys": [
+      {
+        "column": "MemberTypeID",
+        "references_table": "MemberType",
+        "references_column": "id"
+      },
+      {
+        "column": "enrolledBY",
+        "references_table": "users",
+        "references_column": "id"
+      },
+      {
+        "column": "MentorID",
+        "references_table": "users",
+        "references_column": "id"
+      },
+      {
+        "column": "WebsiteRoleID",
+        "references_table": "WebsiteRoles",
+        "references_column": "id"
+      }
+    ],
+    "unique_constraints": [
+      [
+        "Email"
+      ]
+    ],
+    "check_constraints": [
+      "((\"Role\")::text = ANY ((ARRAY['Admin'::character varying, 'Managers'::character varying, 'Students'::character varying])::text[]))",
+      "id IS NOT NULL",
+      "Name IS NOT NULL",
+      "Role IS NOT NULL"
+    ],
+    "indexes": [
+      {
+        "name": "users_pkey",
+        "definition": "CREATE UNIQUE INDEX users_pkey ON public.users USING btree (id)"
+      },
+      {
+        "name": "idx_users_role",
+        "definition": "CREATE INDEX idx_users_role ON public.users USING btree (\"Role\")"
+      },
+      {
+        "name": "idx_users_membertype",
+        "definition": "CREATE INDEX idx_users_membertype ON public.users USING btree (\"MemberTypeID\")"
+      },
+      {
+        "name": "users_Email_key",
+        "definition": "CREATE UNIQUE INDEX \"users_Email_key\" ON public.users USING btree (\"Email\")"
+      },
+      {
+        "name": "idx_users_email",
+        "definition": "CREATE INDEX idx_users_email ON public.users USING btree (\"Email\")"
+      }
+    ],
+    "sample_row": {
+      "id": 5,
+      "Name": "Anurag ",
+      "Role": "Students",
+      "isBACEDevotee": false,
+      "JoinedDate": "2026-02-08",
+      "isActive": true,
+      "MemberTypeID": 2,
+      "enrolledBY": null,
+      "MentorID": null,
+      "WebsiteRoleID": 3,
+      "createdAt": "2026-02-07T18:36:33.056640+00:00",
+      "Email": null,
+      "Phone": null,
+      "PasswordHash": null
+    }
+  }
+}
