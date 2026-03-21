@@ -29,25 +29,25 @@ app.use(express.json());
 
 // ── Public routes (no auth needed) ───────────────────────────
 app.use('/api/auth',               authRouter);
-app.use('/api/enrollment-invites', enrollmentInvitesRouter); // has per-route auth on protected endpoints
+app.use('/api/enrollment-invites', enrollmentInvitesRouter);
 app.get('/api/health', (_, res) => res.json({ ok: true }));
 
-// ── Protected routes (JWT required) ──────────────────────────
-app.use(authenticate);
-
-app.use('/api/users',               usersRouter);
-app.use('/api/member-types',        memberTypesRouter);
-app.use('/api/website-roles',       websiteRolesRouter);
-app.use('/api/iskcon-roles',        iskconRolesRouter);
-app.use('/api/class-types',         classTypesRouter);
-app.use('/api/class-sessions',      classSessionsRouter);
-app.use('/api/classes',             classesRouter);
-app.use('/api/session-enrollments', sessionEnrollmentsRouter);
-app.use('/api/class-attendance',    classAttendanceRouter);
-
-// ── Serve React frontend in production ───────────────────────
+// ── Serve React frontend (public — no auth) ─────────────────
 const clientDist = path.resolve(__dirname, '..', 'client', 'dist');
 app.use(express.static(clientDist));
+
+// ── Protected API routes (JWT required) ──────────────────────
+app.use('/api/users',               authenticate, usersRouter);
+app.use('/api/member-types',        authenticate, memberTypesRouter);
+app.use('/api/website-roles',       authenticate, websiteRolesRouter);
+app.use('/api/iskcon-roles',        authenticate, iskconRolesRouter);
+app.use('/api/class-types',         authenticate, classTypesRouter);
+app.use('/api/class-sessions',      authenticate, classSessionsRouter);
+app.use('/api/classes',             authenticate, classesRouter);
+app.use('/api/session-enrollments', authenticate, sessionEnrollmentsRouter);
+app.use('/api/class-attendance',    authenticate, classAttendanceRouter);
+
+// ── SPA catch-all (public — serves React for client-side routing) ──
 app.get('{*splat}', (req, res) => {
   res.sendFile(path.join(clientDist, 'index.html'));
 });
