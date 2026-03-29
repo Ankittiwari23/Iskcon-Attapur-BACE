@@ -1,9 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Spinner } from '../components/UI';
 import { api } from '../api';
+import { useAuth } from '../context/AuthContext';
 import DataTable from '../components/DataTable';
 
 export default function Attendance() {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'Admin';
   const [classTypes, setClassTypes] = useState([]);
   const [sessions, setSessions] = useState([]);
   const [users, setUsers] = useState([]);
@@ -24,9 +27,12 @@ export default function Attendance() {
   const [isDirty, setIsDirty] = useState(false);
 
   useEffect(() => {
-    Promise.all([api.classTypes.list(), api.classSessions.list(), api.users.list()])
-      .then(([types, sess, u]) => { setClassTypes(types); setSessions(sess); setUsers(u); })
-      .catch(console.error);
+    Promise.allSettled([api.classTypes.list(), api.classSessions.list(), api.users.list()])
+      .then(([types, sess, u]) => {
+        if (types.status === 'fulfilled') setClassTypes(Array.isArray(types.value) ? types.value : []);
+        if (sess.status === 'fulfilled') setSessions(Array.isArray(sess.value) ? sess.value : []);
+        if (u.status === 'fulfilled') setUsers(Array.isArray(u.value) ? u.value : []);
+      });
   }, []);
 
   const filterSession = (ctId) => sessions.filter((s) => String(s.ClassTypeID) === String(ctId));
@@ -138,6 +144,7 @@ export default function Attendance() {
     s => String(s.ClassTypeID) === String(classTypeID) && String(s.SessionID) === String(sessionID)
   );
 
+  const canMark = isAdmin || (selectedClassData && selectedClassData.ClassInstructor === user?.id);
   const presentCount = enrolledUsers.filter(u => !!pendingMap[u.id]).length;
   const absentCount = enrolledUsers.length - presentCount;
 
@@ -225,6 +232,7 @@ export default function Attendance() {
                   </div>
                 </div>
 
+                {canMark && (
                 <div className="px-4 py-2 border-b border-amber-100 flex items-center gap-2 flex-wrap bg-stone-50">
                   <label className="flex items-center gap-2 text-sm cursor-pointer mr-2">
                     <input type="checkbox"
@@ -241,6 +249,12 @@ export default function Attendance() {
                     ✗ Mark Absent
                   </button>
                 </div>
+                )}
+                {!canMark && selectedClassID && (
+                  <div className="px-4 py-2 border-b border-amber-100 bg-yellow-50 text-yellow-800 text-xs">
+                    View only — only the class instructor or an Admin can mark attendance.
+                  </div>
+                )}
 
                 <div className="max-h-[360px] overflow-y-auto">
                   {enrolledUsers.length === 0 ? (
@@ -255,23 +269,32 @@ export default function Attendance() {
                             isSelected ? 'bg-amber-50' : 'hover:bg-stone-50'
                           }`}>
                           <label className="flex items-center gap-3 flex-1 cursor-pointer">
-                            <input type="checkbox" checked={isSelected} onChange={() => toggleSelectUser(u.id)} />
+                            {canMark && <input type="checkbox" checked={isSelected} onChange={() => toggleSelectUser(u.id)} />}
                             <span className="text-sm">{u.Name}</span>
                           </label>
-                          <button onClick={() => toggleIndividual(u.id)}
-                            className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
-                              attended
-                                ? 'bg-green-100 text-green-800 border border-green-300 hover:bg-green-200'
-                                : 'bg-red-50 text-red-600 border border-red-200 hover:bg-red-100'
+                          {canMark ? (
+                            <button onClick={() => toggleIndividual(u.id)}
+                              className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
+                                attended
+                                  ? 'bg-green-100 text-green-800 border border-green-300 hover:bg-green-200'
+                                  : 'bg-red-50 text-red-600 border border-red-200 hover:bg-red-100'
+                              }`}>
+                              {attended ? '✓ Present' : '✗ Absent'}
+                            </button>
+                          ) : (
+                            <span className={`px-3 py-1 rounded text-xs font-medium ${
+                              attended ? 'bg-green-100 text-green-800' : 'bg-red-50 text-red-600'
                             }`}>
-                            {attended ? '✓ Present' : '✗ Absent'}
-                          </button>
+                              {attended ? '✓ Present' : '✗ Absent'}
+                            </span>
+                          )}
                         </div>
                       );
                     })
                   )}
                 </div>
 
+                {canMark && (
                 <div className="px-4 py-3 border-t border-amber-200 bg-stone-50 flex justify-end gap-2">
                   <button onClick={handleCancel} disabled={!isDirty}
                     className="px-4 py-2 border rounded-lg text-sm hover:bg-stone-100 disabled:opacity-40">Cancel</button>
@@ -281,6 +304,7 @@ export default function Attendance() {
                     {saving ? 'Saving...' : 'Update Attendance'}
                   </button>
                 </div>
+                )}
               </div>
             )}
           </div>

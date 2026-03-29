@@ -13,6 +13,7 @@ import ClassSessions     from './pages/ClassSessions';
 import Classes           from './pages/Classes';
 import Enrollments       from './pages/Enrollments';
 import Attendance        from './pages/Attendance';
+import FollowUps         from './pages/FollowUps';
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
@@ -22,6 +23,12 @@ function ProtectedRoute({ children }) {
     </div>
   );
   return user ? children : <Navigate to="/login" replace />;
+}
+
+function RoleRoute({ roles, children }) {
+  const { user } = useAuth();
+  if (!user || !roles.includes(user.role)) return <Navigate to="/" replace />;
+  return children;
 }
 
 function PublicRoute({ children }) {
@@ -42,14 +49,15 @@ function AppRoutes() {
       {/* Protected */}
       <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
         <Route index                 element={<Dashboard />} />
-        <Route path="users"          element={<Users />} />
-        <Route path="member-types"   element={<MemberTypes />} />
-        <Route path="website-roles"  element={<WebsiteRoles />} />
-        <Route path="class-types"    element={<ClassTypes />} />
-        <Route path="class-sessions" element={<ClassSessions />} />
-        <Route path="classes"        element={<Classes />} />
-        <Route path="enrollments"    element={<Enrollments />} />
-        <Route path="attendance"     element={<Attendance />} />
+        <Route path="users"          element={<RoleRoute roles={['Admin']}><Users /></RoleRoute>} />
+        <Route path="member-types"   element={<RoleRoute roles={['Admin']}><MemberTypes /></RoleRoute>} />
+        <Route path="website-roles"  element={<RoleRoute roles={['Admin']}><WebsiteRoles /></RoleRoute>} />
+        <Route path="class-types"    element={<RoleRoute roles={['Admin', 'Managers']}><ClassTypes /></RoleRoute>} />
+        <Route path="class-sessions" element={<RoleRoute roles={['Admin', 'Managers']}><ClassSessions /></RoleRoute>} />
+        <Route path="classes"        element={<RoleRoute roles={['Admin', 'Managers']}><Classes /></RoleRoute>} />
+        <Route path="enrollments"    element={<RoleRoute roles={['Admin', 'Managers']}><Enrollments /></RoleRoute>} />
+        <Route path="attendance"     element={<RoleRoute roles={['Admin', 'Managers']}><Attendance /></RoleRoute>} />
+        <Route path="follow-ups"     element={<RoleRoute roles={['Admin', 'Managers']}><FollowUps /></RoleRoute>} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />

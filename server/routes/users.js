@@ -7,24 +7,43 @@ import { paginatedQuery } from '../db/queryHelper.js';
 
 const router = Router();
 
-const USERS_BASE = `SELECT u."id", u."Name", u."Role", u."Email", u."Phone",
+let HAS_USER_SIGNALS = null;
+async function checkUserSignals(pool) {
+  if (HAS_USER_SIGNALS === true) return true;
+  try {
+    await pool.query('SELECT 1 FROM "UserSignals" LIMIT 0');
+    HAS_USER_SIGNALS = true;
+  } catch { HAS_USER_SIGNALS = false; }
+  return HAS_USER_SIGNALS;
+}
+
+function getUsersBase(withSignals) {
+  const signalCols = withSignals ? `, us."Signal", us."IsInFollowUpList"` : '';
+  const signalJoin = withSignals ? `LEFT JOIN "UserSignals" us ON u."id" = us."UserID"` : '';
+  return `SELECT u."id", u."Name", u."Role", u."Email", u."Phone",
         u."isBACEDevotee", u."JoinedDate", u."isActive",
         u."MemberTypeID", u."enrolledBY", u."MentorID", u."WebsiteRoleID",
         u."createdAt",
-        m."MemberTypeName", w."Name" as "WebsiteRoleName"
+        m."MemberTypeName", w."Name" as "WebsiteRoleName",
+        mentor."Name" as "MentorName"${signalCols}
  FROM "users" u
  LEFT JOIN "MemberType" m ON u."MemberTypeID" = m."id"
- LEFT JOIN "WebsiteRoles" w ON u."WebsiteRoleID" = w."id"`;
+ LEFT JOIN "WebsiteRoles" w ON u."WebsiteRoleID" = w."id"
+ LEFT JOIN "users" mentor ON u."MentorID" = mentor."id"
+ ${signalJoin}`;
+}
 
 router.get('/', async (req, res) => {
   try {
-    const paginated = await paginatedQuery(pool, USERS_BASE, [], {
+    const withSignals = await checkUserSignals(pool);
+    const base = getUsersBase(withSignals);
+    const paginated = await paginatedQuery(pool, base, [], {
       searchColumns: ['Name', 'Email', 'Phone', 'Role', 'MemberTypeName', 'WebsiteRoleName'],
       req,
     });
     if (paginated) return res.json(paginated);
 
-    const { rows } = await pool.query(`${USERS_BASE} ORDER BY u."id"`);
+    const { rows } = await pool.query(`${base} ORDER BY u."id"`);
     res.json(rows);
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -46,6 +65,41 @@ router.get('/:id', async (req, res) => {
     );
     if (rows.length === 0) return res.status(404).json({ error: 'User not found' });
     res.json(rows[0]);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+router.get('/:id/detail', async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const withSignals = await checkUserSignals(pool);
+    const base = getUsersBase(withSignals);
+    const userRes = await pool.query(
+      `${base} WHERE u."id" = $1`,
+      [userId]
+    );
+    if (userRes.rows.length === 0) return res.status(404).json({ error: 'User not found' });
+
+    const enrollments = await pool.query(
+      `SELECT e."id", e."ClassTypeID", e."SessionID", e."StartDate", e."EndDate",
+              ct."ClassType", cs."SessionName",
+              cs."TotalClasses",
+              COUNT(ca."id") FILTER (WHERE ca."Attended" = true) AS "attended",
+              COUNT(ca."id") AS "totalMarked"
+       FROM "SessionEnrollments" e
+       JOIN "ClassType" ct ON e."ClassTypeID" = ct."id"
+       JOIN "ClassSessions" cs ON e."ClassTypeID" = cs."ClassTypeID" AND e."SessionID" = cs."SessionID"
+       LEFT JOIN "Classes" c ON c."ClassTypeID" = e."ClassTypeID" AND c."SessionID" = e."SessionID"
+       LEFT JOIN "ClassAttendance" ca ON ca."ClassID" = c."id" AND ca."UserID" = e."userID"
+       WHERE e."userID" = $1
+       GROUP BY e."id", e."ClassTypeID", e."SessionID", e."StartDate", e."EndDate",
+                ct."ClassType", cs."SessionName", cs."TotalClasses"
+       ORDER BY e."createdAt" DESC`,
+      [userId]
+    );
+
+    res.json({ user: userRes.rows[0], enrollments: enrollments.rows });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

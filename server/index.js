@@ -16,6 +16,11 @@ import classesRouter            from './routes/classes.js';
 import sessionEnrollmentsRouter from './routes/sessionEnrollments.js';
 import classAttendanceRouter    from './routes/classAttendance.js';
 import enrollmentInvitesRouter  from './routes/enrollmentInvites.js';
+import followUpsRouter          from './routes/followUps.js';
+import userSignalsRouter        from './routes/userSignals.js';
+
+import swaggerUi from 'swagger-ui-express';
+import swaggerSpec from './swagger.js';
 
 import { authenticate } from './middleware/Authenticate.js';
 
@@ -31,6 +36,7 @@ app.use(express.json());
 app.use('/api/auth',               authRouter);
 app.use('/api/enrollment-invites', enrollmentInvitesRouter);
 app.get('/api/health', (_, res) => res.json({ ok: true }));
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // ── Serve React frontend (public — no auth) ─────────────────
 const clientDist = path.resolve(__dirname, '..', 'client', 'dist');
@@ -46,6 +52,8 @@ app.use('/api/class-sessions',      authenticate, classSessionsRouter);
 app.use('/api/classes',             authenticate, classesRouter);
 app.use('/api/session-enrollments', authenticate, sessionEnrollmentsRouter);
 app.use('/api/class-attendance',    authenticate, classAttendanceRouter);
+app.use('/api/follow-ups',          authenticate, followUpsRouter);
+app.use('/api/user-signals',        authenticate, userSignalsRouter);
 
 // ── SPA catch-all (public — serves React for client-side routing) ──
 app.get('{*splat}', (req, res) => {

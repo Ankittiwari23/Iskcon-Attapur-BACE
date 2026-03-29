@@ -1,21 +1,21 @@
-// src/Layout.jsx
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 
-const nav = [
-  { to: '/',               label: 'Dashboard' },
-  { to: '/users',          label: 'Students / Users' },
-  { to: '/member-types',   label: 'Member Types' },
-  { to: '/website-roles',  label: 'Website Roles' },
-  { to: '/class-types',    label: 'Class Types' },
-  { to: '/class-sessions', label: 'Class Sessions' },
-  { to: '/classes',        label: 'Classes' },
-  { to: '/enrollments',    label: 'Enrollments' },
-  { to: '/attendance',     label: 'Attendance' },
+const allNav = [
+  { to: '/',               label: 'Dashboard',        roles: ['Admin', 'Managers', 'Students'] },
+  { to: '/follow-ups',     label: 'Follow Ups',       roles: ['Admin', 'Managers'] },
+  { to: '/users',          label: 'Students / Users',  roles: ['Admin'] },
+  { to: '/member-types',   label: 'Member Types',      roles: ['Admin'] },
+  { to: '/website-roles',  label: 'Website Roles',     roles: ['Admin'] },
+  { to: '/class-types',    label: 'Class Types',       roles: ['Admin', 'Managers'] },
+  { to: '/class-sessions', label: 'Class Sessions',    roles: ['Admin', 'Managers'] },
+  { to: '/classes',        label: 'Classes',            roles: ['Admin', 'Managers'] },
+  { to: '/enrollments',    label: 'Enrollments',        roles: ['Admin', 'Managers'] },
+  { to: '/attendance',     label: 'Attendance',         roles: ['Admin', 'Managers'] },
 ];
 
 export default function Layout() {
-  const loc      = useLocation();
+  const loc = useLocation();
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
@@ -24,17 +24,17 @@ export default function Layout() {
     navigate('/login');
   };
 
+  const nav = allNav.filter(item => item.roles.includes(user?.role));
+
   return (
     <div className="min-h-screen bg-amber-50/80 text-stone-900 flex">
       <aside className="w-56 bg-amber-900 text-amber-100 shrink-0 flex flex-col">
 
-        {/* App title */}
         <div className="p-4 border-b border-amber-700">
           <h1 className="font-semibold text-lg">ISKCON BYC</h1>
           <p className="text-amber-200/80 text-sm">Student Management</p>
         </div>
 
-        {/* Navigation */}
         <nav className="p-2 flex-1 overflow-auto">
           {nav.map(({ to, label }) => (
             <Link
@@ -51,7 +51,6 @@ export default function Layout() {
           ))}
         </nav>
 
-        {/* User info + Logout */}
         <div className="p-3 border-t border-amber-700">
           <div className="mb-2">
             <p className="text-sm font-medium text-amber-100 truncate">{user?.name}</p>

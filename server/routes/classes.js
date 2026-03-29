@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import pool from '../db/pool.js';
 import { paginatedQuery } from '../db/queryHelper.js';
+import { requireRole } from '../middleware/Authenticate.js';
 
 const router = Router();
 
@@ -54,10 +55,9 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-router.post('/', async (req, res) => {
+router.post('/', requireRole('Admin'), async (req, res) => {
   try {
     const { ClassTypeID, SessionID, ClassDescription, isActive, StartDate, ClassInstructor, Remarks } = req.body;
-    // Always SingleDay: EndDate = StartDate, Duration = 1, DurationType = 'SingleDay'
     const { rows } = await pool.query(
       `INSERT INTO "Classes" ("ClassTypeID", "SessionID", "ClassDescription", "isActive", "StartDate", "EndDate", "Duration", "DurationType", "ClassInstructor", "Remarks")
        VALUES ($1, $2, $3, $4, $5, $5, 1, 'SingleDay', $6, $7) RETURNING *`,
@@ -67,13 +67,27 @@ router.post('/', async (req, res) => {
       'UPDATE "ClassSessions" SET "TotalClasses" = "TotalClasses" + 1 WHERE "ClassTypeID" = $1 AND "SessionID" = $2',
       [ClassTypeID, SessionID]
     );
+
+    const newClassId = rows[0].id;
+    await pool.query(
+      `INSERT INTO "FollowUps" ("ClassID", "ClassTypeID", "SessionID", "StudentID", "MentorID")
+       SELECT $1, $2, $3, e."userID", u."MentorID"
+       FROM "SessionEnrollments" e
+       JOIN "users" u ON e."userID" = u."id"
+       LEFT JOIN "UserSignals" us ON u."id" = us."UserID"
+       WHERE e."ClassTypeID" = $2 AND e."SessionID" = $3
+         AND (us."IsInFollowUpList" IS NULL OR us."IsInFollowUpList" = true)
+       ON CONFLICT ("ClassID", "StudentID") DO NOTHING`,
+      [newClassId, ClassTypeID, SessionID]
+    );
+
     res.status(201).json(rows[0]);
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
 });
 
-router.put('/:id', async (req, res) => {
+router.put('/:id', requireRole('Admin'), async (req, res) => {
   try {
     const { ClassDescription, isActive, StartDate, ClassInstructor, Remarks } = req.body;
     const { rows } = await pool.query(
@@ -96,7 +110,7 @@ router.put('/:id', async (req, res) => {
   }
 });
 
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requireRole('Admin'), async (req, res) => {
   try {
     const cls = await pool.query('SELECT "ClassTypeID", "SessionID" FROM "Classes" WHERE "id" = $1', [req.params.id]);
     const { rowCount } = await pool.query('DELETE FROM "Classes" WHERE "id" = $1', [req.params.id]);

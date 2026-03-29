@@ -56,6 +56,7 @@ export const api = {
   users: {
     list:        (params)    => params?.page ? request(appendPaginationParams('/users', params)) : request('/users'),
     get:         (id)        => request(`/users/${id}`),
+    detail:      (id)        => request(`/users/${id}/detail`),
     create:      (body)      => request('/users', { method: 'POST', body: JSON.stringify(body) }),
     update:      (id, body)  => request(`/users/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
     delete:      (id)        => request(`/users/${id}`, { method: 'DELETE' }),
@@ -131,6 +132,34 @@ export const api = {
     create:     (body)    => request('/class-attendance', { method: 'POST', body: JSON.stringify(body) }),
     bulkCreate: (records) => request('/class-attendance/bulk', { method: 'POST', body: JSON.stringify({ records }) }),
     update:     (id, body) => request(`/class-attendance/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  },
+  followUps: {
+    list: (params) => {
+      const q = [];
+      if (params?.classTypeID) q.push(`classTypeID=${params.classTypeID}`);
+      if (params?.sessionID)   q.push(`sessionID=${params.sessionID}`);
+      if (params?.classID)     q.push(`classID=${params.classID}`);
+      if (params?.mentorID)    q.push(`mentorID=${params.mentorID}`);
+      if (params?.studentID)   q.push(`studentID=${params.studentID}`);
+      const base = '/follow-ups' + (q.length ? '?' + q.join('&') : '');
+      return params?.page ? request(appendPaginationParams(base, params)) : request(base);
+    },
+    update:       (id, body) => request(`/follow-ups/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+    dashboard:    (mentorID) => request(mentorID ? `/follow-ups/dashboard?mentorID=${mentorID}` : '/follow-ups/dashboard'),
+    managerStats: (classTypeID, sessionID) => {
+      const q = [];
+      if (classTypeID) q.push(`classTypeID=${classTypeID}`);
+      if (sessionID)   q.push(`sessionID=${sessionID}`);
+      return request('/follow-ups/manager-stats' + (q.length ? '?' + q.join('&') : ''));
+    },
+  },
+  userSignals: {
+    list:           (mentorID, params) => {
+      const base = mentorID ? `/user-signals?mentorID=${mentorID}` : '/user-signals';
+      return params?.page ? request(appendPaginationParams(base, params)) : request(base);
+    },
+    update:         (userID, body) => request(`/user-signals/${userID}`, { method: 'PUT', body: JSON.stringify(body) }),
+    toggleFollowUp: (userID, body) => request(`/user-signals/${userID}/toggle-followup`, { method: 'PUT', body: JSON.stringify(body) }),
   },
   enrollmentInvites: {
     list: (ClassTypeID, SessionID, params) => {

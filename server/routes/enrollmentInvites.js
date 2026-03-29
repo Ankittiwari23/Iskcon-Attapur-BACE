@@ -273,16 +273,23 @@ router.post('/pending/:id/approve', authenticate, requireRole('Admin', 'Managers
       [p.Email]
     );
 
+    const mentorID = req.user.role === 'Managers' ? req.user.id : null;
+
     if (existingUser.rows.length > 0) {
       userID = existingUser.rows[0].id;
+      if (mentorID) {
+        await client.query(
+          'UPDATE "users" SET "MentorID" = $2 WHERE "id" = $1 AND "MentorID" IS NULL',
+          [userID, mentorID]
+        );
+      }
     } else {
-      // Create new user with Students role
       const { rows: newUser } = await client.query(
         `INSERT INTO "users"
-           ("Name", "Role", "Email", "Phone", "isActive", "JoinedDate", "enrolledBY")
-         VALUES ($1, 'Students', $2, $3, true, CURRENT_DATE, $4)
+           ("Name", "Role", "Email", "Phone", "isActive", "JoinedDate", "enrolledBY", "MentorID")
+         VALUES ($1, 'Students', $2, $3, true, CURRENT_DATE, $4, $5)
          RETURNING "id"`,
-        [p.Name, p.Email, p.Phone, req.user.id]
+        [p.Name, p.Email, p.Phone, req.user.id, mentorID]
       );
       userID = newUser[0].id;
     }
@@ -295,7 +302,6 @@ router.post('/pending/:id/approve', authenticate, requireRole('Admin', 'Managers
     );
 
     if (alreadyEnrolled.rows.length === 0) {
-      // Enroll in session
       await client.query(
         `INSERT INTO "SessionEnrollments"
            ("ClassTypeID", "SessionID", "userID", "EnrolledByUserID", "StartDate")
@@ -303,15 +309,34 @@ router.post('/pending/:id/approve', authenticate, requireRole('Admin', 'Managers
         [p.ClassTypeID, p.SessionID, userID, req.user.id]
       );
 
-      // Update session total
       await client.query(
         `UPDATE "ClassSessions" SET "TotalEnrolled" = "TotalEnrolled" + 1
          WHERE "ClassTypeID" = $1 AND "SessionID" = $2`,
         [p.ClassTypeID, p.SessionID]
       );
+
+      await client.query(
+        `INSERT INTO "UserSignals" ("UserID", "Signal", "IsInFollowUpList")
+         VALUES ($1, 'green', true)
+         ON CONFLICT ("UserID") DO NOTHING`,
+        [userID]
+      );
+
+      const studentMentorRes = await client.query(
+        'SELECT "MentorID" FROM "users" WHERE "id" = $1', [userID]
+      );
+      const studentMentorID = studentMentorRes.rows[0]?.MentorID || null;
+
+      await client.query(
+        `INSERT INTO "FollowUps" ("ClassID", "ClassTypeID", "SessionID", "StudentID", "MentorID")
+         SELECT c."id", $1, $2, $3, $4
+         FROM "Classes" c
+         WHERE c."ClassTypeID" = $1 AND c."SessionID" = $2
+         ON CONFLICT ("ClassID", "StudentID") DO NOTHING`,
+        [p.ClassTypeID, p.SessionID, userID, studentMentorID]
+      );
     }
 
-    // Mark pending as approved
     await client.query(
       `UPDATE "PendingEnrollments"
        SET "Status" = 'approved', "ReviewedByID" = $2,

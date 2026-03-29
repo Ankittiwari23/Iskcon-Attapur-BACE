@@ -46,9 +46,12 @@ export default function Enrollments() {
   const [form, setForm]             = useState({ ClassTypeID: '', SessionID: '', userID: '', EnrolledByUserID: '', StartDate: '', EndDate: '' });
 
   useEffect(() => {
-    Promise.all([api.classTypes.list(), api.classSessions.list(), api.users.list()])
-      .then(([types, sess, u]) => { setClassTypes(types); setSessions(sess); setUsers(u); })
-      .catch(console.error)
+    Promise.allSettled([api.classTypes.list(), api.classSessions.list(), api.users.list()])
+      .then(([types, sess, u]) => {
+        if (types.status === 'fulfilled') setClassTypes(Array.isArray(types.value) ? types.value : []);
+        if (sess.status === 'fulfilled') setSessions(Array.isArray(sess.value) ? sess.value : []);
+        if (u.status === 'fulfilled') setUsers(Array.isArray(u.value) ? u.value : []);
+      })
       .finally(() => setInitLoading(false));
   }, []);
 

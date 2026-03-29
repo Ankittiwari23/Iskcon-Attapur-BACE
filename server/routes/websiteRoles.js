@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import pool from '../db/pool.js';
 import { paginatedQuery } from '../db/queryHelper.js';
+import { requireRole } from '../middleware/Authenticate.js';
 
 const router = Router();
 
@@ -31,7 +32,7 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-router.post('/', async (req, res) => {
+router.post('/', requireRole('Admin'), async (req, res) => {
   try {
     const { Name, viewAdmin, removeUser, addUser, markAttendance, assignTasks, updateSeva, addSeva } = req.body;
     const { rows } = await pool.query(
@@ -45,7 +46,7 @@ router.post('/', async (req, res) => {
   }
 });
 
-router.put('/:id', async (req, res) => {
+router.put('/:id', requireRole('Admin'), async (req, res) => {
   try {
     const { Name, viewAdmin, removeUser, addUser, markAttendance, assignTasks, updateSeva, addSeva } = req.body;
     const { rows } = await pool.query(
@@ -61,7 +62,7 @@ router.put('/:id', async (req, res) => {
   }
 });
 
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requireRole('Admin'), async (req, res) => {
   try {
     const { rowCount } = await pool.query('DELETE FROM "WebsiteRoles" WHERE "id" = $1', [req.params.id]);
     if (rowCount === 0) return res.status(404).json({ error: 'Website role not found' });

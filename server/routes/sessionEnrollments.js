@@ -57,6 +57,36 @@ router.post('/', async (req, res) => {
       'UPDATE "ClassSessions" SET "TotalEnrolled" = "TotalEnrolled" + 1 WHERE "ClassTypeID" = $1 AND "SessionID" = $2',
       [ClassTypeID, SessionID]
     );
+
+    const enrollerID = EnrolledByUserID || req.user?.id || null;
+    if (enrollerID) {
+      const enrollerRes = await pool.query('SELECT "Role" FROM "users" WHERE "id" = $1', [enrollerID]);
+      if (enrollerRes.rows[0]?.Role === 'Managers') {
+        await pool.query(
+          'UPDATE "users" SET "MentorID" = $2 WHERE "id" = $1 AND "MentorID" IS NULL',
+          [userID, enrollerID]
+        );
+      }
+    }
+
+    await pool.query(
+      `INSERT INTO "UserSignals" ("UserID", "Signal", "IsInFollowUpList")
+       VALUES ($1, 'green', true)
+       ON CONFLICT ("UserID") DO NOTHING`,
+      [userID]
+    );
+
+    const mentorRes = await pool.query('SELECT "MentorID" FROM "users" WHERE "id" = $1', [userID]);
+    const mentorID = mentorRes.rows[0]?.MentorID || null;
+    await pool.query(
+      `INSERT INTO "FollowUps" ("ClassID", "ClassTypeID", "SessionID", "StudentID", "MentorID")
+       SELECT c."id", $1, $2, $3, $4
+       FROM "Classes" c
+       WHERE c."ClassTypeID" = $1 AND c."SessionID" = $2
+       ON CONFLICT ("ClassID", "StudentID") DO NOTHING`,
+      [ClassTypeID, SessionID, userID, mentorID]
+    );
+
     res.status(201).json(rows[0]);
   } catch (e) {
     res.status(500).json({ error: e.message });

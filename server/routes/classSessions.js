@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import pool from '../db/pool.js';
 import { paginatedQuery } from '../db/queryHelper.js';
+import { requireRole } from '../middleware/Authenticate.js';
 
 const router = Router();
 
@@ -47,7 +48,7 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-router.post('/', async (req, res) => {
+router.post('/', requireRole('Admin'), async (req, res) => {
   try {
     const { ClassTypeID, SessionName, StartDate, EndDate, SessionIncharge } = req.body;
     const client = await pool.connect();
@@ -72,7 +73,7 @@ router.post('/', async (req, res) => {
   }
 });
 
-router.put('/:id', async (req, res) => {
+router.put('/:id', requireRole('Admin'), async (req, res) => {
   try {
     const { SessionName, StartDate, EndDate, SessionIncharge, TotalEnrolled, TotalClasses } = req.body;
     const { rows } = await pool.query(
@@ -88,7 +89,7 @@ router.put('/:id', async (req, res) => {
   }
 });
 
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requireRole('Admin'), async (req, res) => {
   try {
     const { rowCount } = await pool.query('DELETE FROM "ClassSessions" WHERE "id" = $1', [req.params.id]);
     if (rowCount === 0) return res.status(404).json({ error: 'Class session not found' });
