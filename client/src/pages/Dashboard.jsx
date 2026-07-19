@@ -39,18 +39,13 @@ function SignalDot({ signal }) {
 
 function AdminDashboard() {
   const [stats, setStats] = useState(null);
-  const [pendingFollowUps, setPendingFollowUps] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    Promise.all([
-      api.followUps.dashboard(),
-      api.followUps.list({ page: 1, pageSize: 15 }),
-    ]).then(([s, fuData]) => {
-      setStats(s);
-      const rows = Array.isArray(fuData) ? fuData : fuData.rows || [];
-      setPendingFollowUps(rows.filter(f => f.Status === 'no_response' || f.Status === 'call_not_attended'));
-    }).catch(console.error).finally(() => setLoading(false));
+    api.followUps.dashboard()
+      .then(setStats)
+      .catch(console.error)
+      .finally(() => setLoading(false));
   }, []);
 
   if (loading) return <p className="text-stone-400">Loading dashboard...</p>;
@@ -63,43 +58,10 @@ function AdminDashboard() {
         <SummaryCard label="Confirmed" value={stats?.confirmed} />
         <SummaryCard label="Attended" value={stats?.attended} />
       </div>
-
-      {pendingFollowUps.length > 0 && (
-        <div className="bg-white rounded-lg border border-amber-200 p-4 mb-6">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="font-semibold text-amber-900">Pending Follow-Ups</h2>
-            <Link to="/follow-ups" className="text-sm text-amber-700 hover:underline">View all →</Link>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-amber-50 text-left">
-                <tr>
-                  <th className="p-2">Student</th>
-                  <th className="p-2">Mentor</th>
-                  <th className="p-2">Class</th>
-                  <th className="p-2">Date</th>
-                  <th className="p-2">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pendingFollowUps.map(fu => (
-                  <tr key={fu.id} className="border-t border-amber-100">
-                    <td className="p-2 font-medium">{fu.StudentName}</td>
-                    <td className="p-2">{fu.MentorName || '—'}</td>
-                    <td className="p-2">{fu.ClassDescription || fu.ClassType}</td>
-                    <td className="p-2">{fu.ClassDate ? new Date(fu.ClassDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : '—'}</td>
-                    <td className="p-2">
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_BADGE[fu.Status] || ''}`}>
-                        {STATUS_LABELS[fu.Status] || fu.Status}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+      <div className="bg-white rounded-lg border border-amber-200 p-4 mb-6 flex items-center justify-between">
+        <p className="text-sm text-stone-600">Review follow-ups grouped by manager and student.</p>
+        <Link to="/follow-ups" className="text-sm text-amber-700 hover:underline">Go to Follow-Ups →</Link>
+      </div>
     </>
   );
 }

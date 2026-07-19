@@ -1,4 +1,3 @@
-// server/index.js
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
@@ -8,7 +7,6 @@ import pool from './db/pool.js';
 import authRouter               from './routes/Auth.js';
 import usersRouter              from './routes/users.js';
 import memberTypesRouter        from './routes/memberTypes.js';
-import websiteRolesRouter       from './routes/websiteRoles.js';
 import iskconRolesRouter        from './routes/iskconRoles.js';
 import classTypesRouter         from './routes/classTypes.js';
 import classSessionsRouter      from './routes/classSessions.js';
@@ -45,7 +43,6 @@ app.use(express.static(clientDist));
 // ── Protected API routes (JWT required) ──────────────────────
 app.use('/api/users',               authenticate, usersRouter);
 app.use('/api/member-types',        authenticate, memberTypesRouter);
-app.use('/api/website-roles',       authenticate, websiteRolesRouter);
 app.use('/api/iskcon-roles',        authenticate, iskconRolesRouter);
 app.use('/api/class-types',         authenticate, classTypesRouter);
 app.use('/api/class-sessions',      authenticate, classSessionsRouter);

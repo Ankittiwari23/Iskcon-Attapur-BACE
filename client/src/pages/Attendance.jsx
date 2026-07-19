@@ -35,7 +35,9 @@ export default function Attendance() {
       });
   }, []);
 
-  const filterSession = (ctId) => sessions.filter((s) => String(s.ClassTypeID) === String(ctId));
+  const filterSession = (ctId) => sessions
+    .filter((s) => String(s.ClassTypeID) === String(ctId))
+    .sort((a, b) => b.SessionID - a.SessionID);
 
   const fetchClasses = useCallback((params) => {
     return api.classes.list(classTypeID, sessionID, params);

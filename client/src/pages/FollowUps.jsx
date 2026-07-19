@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { api } from '../api';
 import { useAuth } from '../context/AuthContext';
-import DataTable from '../components/DataTable';
 
 const STATUS_OPTIONS = [
   { value: 'no_response',        label: 'No Response' },
@@ -58,6 +57,21 @@ export default function FollowUps() {
   const [editingRow, setEditingRow] = useState(null);
   const [editForm, setEditForm] = useState({ Status: '', Response: '' });
 
+  // Manager (mentor) view: student-grouped list + per-student dialog
+  const [managerRows, setManagerRows] = useState([]);
+  const [managerRowsLoading, setManagerRowsLoading] = useState(false);
+  const [selectedStudent, setSelectedStudent] = useState(null);
+
+  // Accordion: which student cards are expanded in the admin detail modal
+  const [expandedStudents, setExpandedStudents] = useState(new Set());
+  const toggleStudent = (id) => {
+    setExpandedStudents(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
   useEffect(() => {
     api.classTypes.list().then(setClassTypes).catch(console.error);
   }, []);
@@ -65,7 +79,8 @@ export default function FollowUps() {
   useEffect(() => {
     if (selectedCT) {
       api.classSessions.list(selectedCT).then(data => {
-        setSessions(Array.isArray(data) ? data : data.rows || []);
+        const list = Array.isArray(data) ? data : data.rows || [];
+        setSessions(list.sort((a, b) => b.SessionID - a.SessionID));
       }).catch(console.error);
     } else {
       setSessions([]);
@@ -73,6 +88,14 @@ export default function FollowUps() {
     setSelectedSession('');
     setHasLoaded(false);
   }, [selectedCT]);
+
+  const loadManagerRows = useCallback(() => {
+    setManagerRowsLoading(true);
+    api.followUps.list({ mentorID: user.id, classTypeID: selectedCT, sessionID: selectedSession })
+      .then(data => setManagerRows(Array.isArray(data) ? data : data.rows || []))
+      .catch(console.error)
+      .finally(() => setManagerRowsLoading(false));
+  }, [user?.id, selectedCT, selectedSession]);
 
   const applyFilter = () => {
     if (!selectedCT || !selectedSession) { alert('Please select both Class Type and Session.'); return; }
@@ -84,6 +107,8 @@ export default function FollowUps() {
         .then(setManagerStats)
         .catch(console.error)
         .finally(() => setManagerLoading(false));
+    } else if (isManager) {
+      loadManagerRows();
     }
   };
 
@@ -91,6 +116,7 @@ export default function FollowUps() {
     setDetailManager(mgr);
     setDetailLoading(true);
     setEditingRow(null);
+    setExpandedStudents(new Set());
     try {
       const data = await api.followUps.list({
         mentorID: mgr.ManagerID,
@@ -119,101 +145,18 @@ export default function FollowUps() {
       setRefreshKey(k => k + 1);
       if (isAdmin) {
         api.followUps.managerStats(selectedCT, selectedSession).then(setManagerStats).catch(console.error);
+      } else if (isManager) {
+        loadManagerRows();
       }
     } catch (e) { alert(e.message); }
   };
 
   const cancelEdit = () => setEditingRow(null);
 
-  const fetchFollowUps = useCallback((params) => {
-    const p = { ...params, classTypeID: selectedCT, sessionID: selectedSession };
-    if (isManager) p.mentorID = user.id;
-    return api.followUps.list(p);
-  }, [selectedCT, selectedSession, isManager, user?.id]);
-
-  const managerColumns = [
-    { key: 'StudentName', label: 'Student', sortable: true, filterable: true, cellClass: 'font-medium' },
-    { key: 'MentorName', label: 'Mentor', sortable: true, filterable: true },
-    { key: 'ClassDate', label: 'Class Date', sortable: true, render: (v) => formatDate(v) },
-    { key: 'ClassDescription', label: 'Class', sortable: true, filterable: true },
-    {
-      key: 'Status', label: 'Follow-Up', sortable: true,
-      render: (v, row) => {
-        if (editingRow === row.id) {
-          return (
-            <select className="border rounded px-2 py-1 text-xs" value={editForm.Status}
-              onChange={(e) => setEditForm(f => ({ ...f, Status: e.target.value }))}>
-              {STATUS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </select>
-          );
-        }
-        const opt = STATUS_OPTIONS.find(o => o.value === v);
-        return <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[v] || ''}`}>{opt?.label || v || '—'}</span>;
-      },
-    },
-    {
-      key: 'Response', label: 'Response', filterable: true,
-      render: (v, row) => {
-        if (editingRow === row.id) {
-          return <input className="border rounded px-2 py-1 text-xs w-full min-w-[120px]" value={editForm.Response}
-            onChange={(e) => setEditForm(f => ({ ...f, Response: e.target.value }))} placeholder="Details..." />;
-        }
-        return <span className="text-xs text-stone-600">{v || '—'}</span>;
-      },
-    },
-    {
-      key: 'AttendedResult', label: 'Attended', sortable: true,
-      render: (v) => v ? (
-        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${RESULT_BADGE[v] || ''}`}>{v === 'attended' ? 'Yes' : 'No'}</span>
-      ) : <span className="text-xs text-stone-400">Pending</span>,
-    },
-    {
-      key: 'studentAttended', label: 'Overall', sortable: true,
-      render: (_, row) => {
-        const total = parseInt(row.studentTotalClasses) || 0;
-        const attended = parseInt(row.studentAttended) || 0;
-        const pct = total > 0 ? Math.round(attended / total * 100) : 0;
-        return (
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-medium">{attended}/{total}</span>
-            <div className="w-12 bg-stone-100 rounded-full h-1.5">
-              <div className={`h-1.5 rounded-full ${pct >= 80 ? 'bg-green-500' : pct >= 60 ? 'bg-yellow-400' : pct >= 40 ? 'bg-orange-500' : 'bg-red-500'}`}
-                style={{ width: `${pct}%` }} />
-            </div>
-            <span className="text-xs text-stone-500">{pct}%</span>
-          </div>
-        );
-      },
-    },
-    {
-      key: 'Signal', label: 'Status', sortable: true,
-      render: (v) => v ? (
-        <div className="flex items-center gap-1.5">
-          <span className={`inline-block w-2.5 h-2.5 rounded-full ${SIGNAL_COLORS[v] || 'bg-stone-300'}`} />
-          <span className="text-xs">{SIGNAL_LABELS[v] || v}</span>
-        </div>
-      ) : <span className="text-xs text-stone-400">—</span>,
-    },
-    {
-      key: '_actions', label: '',
-      render: (_, row) => {
-        if (editingRow === row.id) {
-          return (
-            <div className="flex gap-1">
-              <button onClick={() => saveEdit(row.id)} className="text-green-700 hover:underline text-xs">Save</button>
-              <button onClick={cancelEdit} className="text-stone-500 hover:underline text-xs">Cancel</button>
-            </div>
-          );
-        }
-        return <button onClick={() => startEdit(row)} className="text-amber-700 hover:underline text-xs">Edit</button>;
-      },
-    },
-  ];
-
-  const groupedStudents = (() => {
-    if (!detailRows.length) return [];
+  const groupByStudent = (rows) => {
+    if (!rows?.length) return [];
     const map = {};
-    for (const r of detailRows) {
+    for (const r of rows) {
       if (!map[r.StudentID]) {
         map[r.StudentID] = {
           StudentID: r.StudentID, StudentName: r.StudentName, Signal: r.Signal,
@@ -225,7 +168,124 @@ export default function FollowUps() {
       map[r.StudentID].classes.push(r);
     }
     return Object.values(map);
-  })();
+  };
+
+  const groupedStudents = groupByStudent(detailRows);
+  const managerStudents = groupByStudent(managerRows);
+
+  // Keep the open student dialog in sync after edits reload the rows
+  useEffect(() => {
+    if (!selectedStudent) return;
+    const fresh = managerStudents.find(s => s.StudentID === selectedStudent.StudentID);
+    if (fresh) setSelectedStudent(fresh);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [managerRows]);
+
+  // Renders a student's per-class follow-up table (shared by admin + manager dialogs)
+  const renderStudentClasses = (student) => (
+   <div className="overflow-x-auto">
+    <table className="w-full text-xs min-w-[640px]">
+      <thead className="bg-stone-50 text-left">
+        <tr>
+          <th className="px-4 py-1.5">Class</th>
+          <th className="px-4 py-1.5">Date</th>
+          <th className="px-4 py-1.5">Follow-Up</th>
+          <th className="px-4 py-1.5">Response</th>
+          <th className="px-4 py-1.5">Attended</th>
+          <th className="px-4 py-1.5">Converted</th>
+          <th className="px-4 py-1.5"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {student.classes.map(r => {
+          const converted = r.Status === 'confirmed' && r.AttendedResult === 'attended';
+          const isEditing = editingRow === r.id;
+          return (
+            <tr key={r.id} className="border-t border-stone-100">
+              <td className="px-4 py-2">{r.ClassDescription || `Class #${r.ClassID}`}</td>
+              <td className="px-4 py-2">{formatDate(r.ClassDate)}</td>
+              <td className="px-4 py-2">
+                {isEditing ? (
+                  <select className="border rounded px-1.5 py-0.5 text-xs" value={editForm.Status}
+                    onChange={(e) => setEditForm(f => ({ ...f, Status: e.target.value }))}>
+                    {STATUS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </select>
+                ) : (
+                  <span className={`px-2 py-0.5 rounded-full font-medium ${STATUS_COLORS[r.Status] || ''}`}>
+                    {STATUS_OPTIONS.find(o => o.value === r.Status)?.label || r.Status}
+                  </span>
+                )}
+              </td>
+              <td className="px-4 py-2">
+                {isEditing ? (
+                  <input className="border rounded px-1.5 py-0.5 text-xs w-full min-w-[100px]" value={editForm.Response}
+                    onChange={(e) => setEditForm(f => ({ ...f, Response: e.target.value }))} placeholder="Details..." />
+                ) : (
+                  <span className="text-stone-600">{r.Response || '—'}</span>
+                )}
+              </td>
+              <td className="px-4 py-2">
+                {r.AttendedResult ? (
+                  <span className={`px-2 py-0.5 rounded-full font-medium ${RESULT_BADGE[r.AttendedResult] || ''}`}>
+                    {r.AttendedResult === 'attended' ? 'Yes' : 'No'}
+                  </span>
+                ) : <span className="text-stone-400">Pending</span>}
+              </td>
+              <td className="px-4 py-2">
+                {r.Status === 'confirmed' ? (
+                  converted
+                    ? <span className="px-2 py-0.5 rounded-full font-medium bg-green-100 text-green-700">Yes</span>
+                    : r.AttendedResult
+                      ? <span className="px-2 py-0.5 rounded-full font-medium bg-red-100 text-red-700">No</span>
+                      : <span className="text-stone-400">Pending</span>
+                ) : <span className="text-stone-300">—</span>}
+              </td>
+              <td className="px-4 py-2">
+                {isEditing ? (
+                  <div className="flex gap-1">
+                    <button onClick={() => saveEdit(r.id)} className="text-green-700 hover:underline">Save</button>
+                    <button onClick={cancelEdit} className="text-stone-500 hover:underline">Cancel</button>
+                  </div>
+                ) : (
+                  <button onClick={() => startEdit(r)} className="text-amber-700 hover:underline">Edit</button>
+                )}
+              </td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+   </div>
+  );
+
+  const StudentSummaryRow = ({ student, onView }) => {
+    const pct = student.totalClasses > 0 ? Math.round(student.attendedOverall / student.totalClasses * 100) : 0;
+    return (
+      <tr className="border-t border-amber-100 hover:bg-amber-50 cursor-pointer" onClick={onView}>
+        <td className="p-3 font-medium text-amber-900">{student.StudentName}</td>
+        <td className="p-3">
+          {student.Signal ? (
+            <span className="flex items-center gap-1.5">
+              <span className={`inline-block w-2.5 h-2.5 rounded-full ${SIGNAL_COLORS[student.Signal] || 'bg-stone-300'}`} />
+              <span className="text-xs">{SIGNAL_LABELS[student.Signal]}</span>
+            </span>
+          ) : <span className="text-xs text-stone-400">—</span>}
+        </td>
+        <td className="p-3">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-medium">{student.attendedOverall}/{student.totalClasses}</span>
+            <div className="w-16 bg-stone-100 rounded-full h-1.5">
+              <div className={`h-1.5 rounded-full ${pct >= 80 ? 'bg-green-500' : pct >= 60 ? 'bg-yellow-400' : pct >= 40 ? 'bg-orange-500' : 'bg-red-500'}`}
+                style={{ width: `${pct}%` }} />
+            </div>
+            <span className="text-xs text-stone-500">{pct}%</span>
+          </div>
+        </td>
+        <td className="p-3 text-xs text-stone-500">{student.classes.length} class follow-up(s)</td>
+        <td className="p-3"><button className="text-amber-700 hover:underline text-xs">View / Update</button></td>
+      </tr>
+    );
+  };
 
   return (
     <div>
@@ -318,14 +378,44 @@ export default function FollowUps() {
           </p>
         </div>
       ) : (
-        /* ── Manager View: Follow-Up Records Table ── */
-        <DataTable columns={managerColumns} fetchData={fetchFollowUps} refreshKey={refreshKey} emptyMessage="No follow-ups for this session." />
+        /* ── Manager View: Student-grouped list ── */
+        <div className="bg-white rounded-lg border border-amber-200 overflow-x-auto">
+          {managerRowsLoading ? (
+            <div className="p-8 text-center text-stone-400">
+              <div className="inline-block h-5 w-5 border-2 border-amber-400 border-t-transparent rounded-full animate-spin mr-2" />
+              Loading your students...
+            </div>
+          ) : managerStudents.length === 0 ? (
+            <div className="p-8 text-center text-stone-400">No follow-ups for this session.</div>
+          ) : (
+            <table className="w-full text-sm">
+              <thead className="bg-amber-100 text-left">
+                <tr>
+                  <th className="p-3">Student</th>
+                  <th className="p-3">Status</th>
+                  <th className="p-3">Attendance</th>
+                  <th className="p-3">Follow-Ups</th>
+                  <th className="p-3"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {managerStudents.map(student => (
+                  <StudentSummaryRow key={student.StudentID} student={student}
+                    onView={() => setSelectedStudent(student)} />
+                ))}
+              </tbody>
+            </table>
+          )}
+          <p className="px-4 py-2 text-xs text-stone-400 border-t border-amber-100">
+            Click a student to view and update their follow-ups
+          </p>
+        </div>
       )}
 
       {/* ── Manager Detail Modal (Admin clicks a manager row) ── */}
       {detailManager && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-10" onClick={closeDetail}>
-          <div className="bg-white rounded-xl p-6 w-full max-w-4xl shadow-xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-10 p-4" onClick={closeDetail}>
+          <div className="bg-white rounded-xl p-4 sm:p-6 w-full max-w-4xl shadow-xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h2 className="text-lg font-semibold text-amber-900">{detailManager.ManagerName}</h2>
@@ -344,101 +434,63 @@ export default function FollowUps() {
             ) : groupedStudents.length === 0 ? (
               <p className="text-stone-400 text-center py-8">No student data found.</p>
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-3">
                 {groupedStudents.map(student => {
                   const pct = student.totalClasses > 0 ? Math.round(student.attendedOverall / student.totalClasses * 100) : 0;
+                  const isOpen = expandedStudents.has(student.StudentID);
                   return (
                     <div key={student.StudentID} className="border border-amber-200 rounded-lg overflow-hidden">
-                      <div className="bg-amber-50 px-4 py-2.5 flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <span className="font-medium text-amber-900">{student.StudentName}</span>
+                      <button
+                        type="button"
+                        onClick={() => toggleStudent(student.StudentID)}
+                        className="w-full bg-amber-50 px-4 py-2.5 flex items-center justify-between gap-2 text-left hover:bg-amber-100 transition-colors"
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className={`text-stone-400 text-xs transition-transform ${isOpen ? 'rotate-90' : ''}`}>▶</span>
+                          <span className="font-medium text-amber-900 truncate">{student.StudentName}</span>
                           {student.Signal && (
-                            <span className="flex items-center gap-1">
+                            <span className="flex items-center gap-1 shrink-0">
                               <span className={`inline-block w-2.5 h-2.5 rounded-full ${SIGNAL_COLORS[student.Signal] || 'bg-stone-300'}`} />
-                              <span className="text-xs text-stone-500">{SIGNAL_LABELS[student.Signal]}</span>
+                              <span className="text-xs text-stone-500 hidden sm:inline">{SIGNAL_LABELS[student.Signal]}</span>
                             </span>
                           )}
                         </div>
-                        <span className="text-xs text-stone-500">
-                          Attendance: <strong>{student.attendedOverall}/{student.totalClasses}</strong> ({pct}%)
+                        <span className="text-xs text-stone-500 shrink-0">
+                          <strong>{student.attendedOverall}/{student.totalClasses}</strong> ({pct}%)
                         </span>
-                      </div>
-                      <table className="w-full text-xs">
-                        <thead className="bg-stone-50 text-left">
-                          <tr>
-                            <th className="px-4 py-1.5">Class</th>
-                            <th className="px-4 py-1.5">Date</th>
-                            <th className="px-4 py-1.5">Follow-Up</th>
-                            <th className="px-4 py-1.5">Response</th>
-                            <th className="px-4 py-1.5">Attended</th>
-                            <th className="px-4 py-1.5">Converted</th>
-                            <th className="px-4 py-1.5"></th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {student.classes.map(r => {
-                            const converted = r.Status === 'confirmed' && r.AttendedResult === 'attended';
-                            const isEditing = editingRow === r.id;
-                            return (
-                              <tr key={r.id} className="border-t border-stone-100">
-                                <td className="px-4 py-2">{r.ClassDescription || `Class #${r.ClassID}`}</td>
-                                <td className="px-4 py-2">{formatDate(r.ClassDate)}</td>
-                                <td className="px-4 py-2">
-                                  {isEditing ? (
-                                    <select className="border rounded px-1.5 py-0.5 text-xs" value={editForm.Status}
-                                      onChange={(e) => setEditForm(f => ({ ...f, Status: e.target.value }))}>
-                                      {STATUS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                                    </select>
-                                  ) : (
-                                    <span className={`px-2 py-0.5 rounded-full font-medium ${STATUS_COLORS[r.Status] || ''}`}>
-                                      {STATUS_OPTIONS.find(o => o.value === r.Status)?.label || r.Status}
-                                    </span>
-                                  )}
-                                </td>
-                                <td className="px-4 py-2">
-                                  {isEditing ? (
-                                    <input className="border rounded px-1.5 py-0.5 text-xs w-full min-w-[100px]" value={editForm.Response}
-                                      onChange={(e) => setEditForm(f => ({ ...f, Response: e.target.value }))} placeholder="Details..." />
-                                  ) : (
-                                    <span className="text-stone-600">{r.Response || '—'}</span>
-                                  )}
-                                </td>
-                                <td className="px-4 py-2">
-                                  {r.AttendedResult ? (
-                                    <span className={`px-2 py-0.5 rounded-full font-medium ${RESULT_BADGE[r.AttendedResult] || ''}`}>
-                                      {r.AttendedResult === 'attended' ? 'Yes' : 'No'}
-                                    </span>
-                                  ) : <span className="text-stone-400">Pending</span>}
-                                </td>
-                                <td className="px-4 py-2">
-                                  {r.Status === 'confirmed' ? (
-                                    converted
-                                      ? <span className="px-2 py-0.5 rounded-full font-medium bg-green-100 text-green-700">Yes</span>
-                                      : r.AttendedResult
-                                        ? <span className="px-2 py-0.5 rounded-full font-medium bg-red-100 text-red-700">No</span>
-                                        : <span className="text-stone-400">Pending</span>
-                                  ) : <span className="text-stone-300">—</span>}
-                                </td>
-                                <td className="px-4 py-2">
-                                  {isEditing ? (
-                                    <div className="flex gap-1">
-                                      <button onClick={() => saveEdit(r.id)} className="text-green-700 hover:underline">Save</button>
-                                      <button onClick={cancelEdit} className="text-stone-500 hover:underline">Cancel</button>
-                                    </div>
-                                  ) : (
-                                    <button onClick={() => startEdit(r)} className="text-amber-700 hover:underline">Edit</button>
-                                  )}
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
+                      </button>
+                      {isOpen && renderStudentClasses(student)}
                     </div>
                   );
                 })}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Manager Student Detail Dialog ── */}
+      {selectedStudent && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-10 p-4" onClick={() => setSelectedStudent(null)}>
+          <div className="bg-white rounded-xl p-6 w-full max-w-3xl shadow-xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <h2 className="text-lg font-semibold text-amber-900">{selectedStudent.StudentName}</h2>
+                {selectedStudent.Signal && (
+                  <span className="flex items-center gap-1">
+                    <span className={`inline-block w-2.5 h-2.5 rounded-full ${SIGNAL_COLORS[selectedStudent.Signal] || 'bg-stone-300'}`} />
+                    <span className="text-xs text-stone-500">{SIGNAL_LABELS[selectedStudent.Signal]}</span>
+                  </span>
+                )}
+                <span className="text-xs text-stone-500">
+                  Attendance: <strong>{selectedStudent.attendedOverall}/{selectedStudent.totalClasses}</strong>
+                </span>
+              </div>
+              <button onClick={() => setSelectedStudent(null)} className="text-stone-400 hover:text-stone-600 text-xl">&times;</button>
+            </div>
+            <div className="border border-amber-200 rounded-lg overflow-hidden">
+              {renderStudentClasses(selectedStudent)}
+            </div>
           </div>
         </div>
       )}

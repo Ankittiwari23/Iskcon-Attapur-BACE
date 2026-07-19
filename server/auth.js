@@ -1,7 +1,3 @@
-// routes/auth.js
-// Install required packages first:
-//   npm install bcrypt jsonwebtoken
-
 import { Router } from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';

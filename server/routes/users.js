@@ -1,4 +1,3 @@
-// routes/users.js
 import { Router } from 'express';
 import bcrypt from 'bcrypt';
 import pool from '../db/pool.js';
@@ -22,13 +21,12 @@ function getUsersBase(withSignals) {
   const signalJoin = withSignals ? `LEFT JOIN "UserSignals" us ON u."id" = us."UserID"` : '';
   return `SELECT u."id", u."Name", u."Role", u."Email", u."Phone",
         u."isBACEDevotee", u."JoinedDate", u."isActive",
-        u."MemberTypeID", u."enrolledBY", u."MentorID", u."WebsiteRoleID",
+        u."MemberTypeID", u."enrolledBY", u."MentorID",
         u."createdAt",
-        m."MemberTypeName", w."Name" as "WebsiteRoleName",
+        m."MemberTypeName",
         mentor."Name" as "MentorName"${signalCols}
  FROM "users" u
  LEFT JOIN "MemberType" m ON u."MemberTypeID" = m."id"
- LEFT JOIN "WebsiteRoles" w ON u."WebsiteRoleID" = w."id"
  LEFT JOIN "users" mentor ON u."MentorID" = mentor."id"
  ${signalJoin}`;
 }
@@ -55,11 +53,10 @@ router.get('/:id', async (req, res) => {
     const { rows } = await pool.query(
       `SELECT u."id", u."Name", u."Role", u."Email", u."Phone",
               u."isBACEDevotee", u."JoinedDate", u."isActive",
-              u."MemberTypeID", u."WebsiteRoleID", u."createdAt",
-              m."MemberTypeName", w."Name" as "WebsiteRoleName"
+              u."MemberTypeID", u."createdAt",
+              m."MemberTypeName"
        FROM "users" u
        LEFT JOIN "MemberType" m ON u."MemberTypeID" = m."id"
-       LEFT JOIN "WebsiteRoles" w ON u."WebsiteRoleID" = w."id"
        WHERE u."id" = $1`,
       [req.params.id]
     );
@@ -107,20 +104,25 @@ router.get('/:id/detail', async (req, res) => {
 
 router.post('/', async (req, res) => {
   try {
-    const { Name, Role, Email, Phone, isBACEDevotee, JoinedDate, isActive,
-            MemberTypeID, enrolledBY, MentorID, WebsiteRoleID } = req.body;
+    const { Name, Role, Email, Phone, Password, isBACEDevotee, JoinedDate, isActive,
+            MemberTypeID, enrolledBY, MentorID } = req.body;
+
+    const passwordHash = Password ? await bcrypt.hash(Password, 10) : null;
 
     const { rows } = await pool.query(
-      `INSERT INTO "users" ("Name", "Role", "Email", "Phone", "isBACEDevotee", "JoinedDate",
-                            "isActive", "MemberTypeID", "enrolledBY", "MentorID", "WebsiteRoleID")
+      `INSERT INTO "users" ("Name", "Role", "Email", "Phone", "PasswordHash", "isBACEDevotee", "JoinedDate",
+                            "isActive", "MemberTypeID", "enrolledBY", "MentorID")
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
-      [Name ?? '', Role ?? 'Students', Email || null, Phone || null,
+      [Name ?? '', Role ?? 'Students', Email || null, Phone || null, passwordHash,
        !!isBACEDevotee, JoinedDate || null, isActive !== false,
-       MemberTypeID || null, enrolledBY || null, MentorID || null, WebsiteRoleID || null]
+       MemberTypeID || null, enrolledBY || null, MentorID || null]
     );
     const { PasswordHash: _, ...safeUser } = rows[0];
     res.status(201).json(safeUser);
   } catch (e) {
+    if (e.code === '23505') {
+      return res.status(409).json({ error: 'A user with this email already exists.' });
+    }
     res.status(500).json({ error: e.message });
   }
 });
@@ -128,7 +130,7 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const { Name, Role, Email, Phone, isBACEDevotee, JoinedDate, isActive,
-            MemberTypeID, enrolledBY, MentorID, WebsiteRoleID } = req.body;
+            MemberTypeID, enrolledBY, MentorID } = req.body;
     const { rows } = await pool.query(
       `UPDATE "users" SET
         "Name"          = COALESCE($2,  "Name"),
@@ -140,16 +142,18 @@ router.put('/:id', async (req, res) => {
         "isActive"      = COALESCE($8,  "isActive"),
         "MemberTypeID"  = COALESCE($9,  "MemberTypeID"),
         "enrolledBY"    = COALESCE($10, "enrolledBY"),
-        "MentorID"      = COALESCE($11, "MentorID"),
-        "WebsiteRoleID" = COALESCE($12, "WebsiteRoleID")
+        "MentorID"      = COALESCE($11, "MentorID")
        WHERE "id" = $1 RETURNING *`,
       [req.params.id, Name, Role, Email, Phone, isBACEDevotee, JoinedDate,
-       isActive, MemberTypeID, enrolledBY, MentorID, WebsiteRoleID]
+       isActive, MemberTypeID, enrolledBY, MentorID]
     );
     if (rows.length === 0) return res.status(404).json({ error: 'User not found' });
     const { PasswordHash: _, ...safeUser } = rows[0];
     res.json(safeUser);
   } catch (e) {
+    if (e.code === '23505') {
+      return res.status(409).json({ error: 'A user with this email already exists.' });
+    }
     res.status(500).json({ error: e.message });
   }
 });
@@ -173,8 +177,54 @@ router.put('/:id/set-password', requireRole('Admin'), async (req, res) => {
   }
 });
 
+// ── List a user's mentees (students they mentor) ─────────────
+router.get('/:id/mentees', async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT "id", "Name", "Role", "Email" FROM "users"
+       WHERE "MentorID" = $1 ORDER BY "Name"`,
+      [req.params.id]
+    );
+    res.json(rows);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ── Reassign a set of students to a new mentor (or clear) ────
+router.post('/reassign-mentor', requireRole('Admin'), async (req, res) => {
+  try {
+    const { studentIDs, newMentorID } = req.body;
+    if (!Array.isArray(studentIDs) || studentIDs.length === 0) {
+      return res.status(400).json({ error: 'studentIDs array is required.' });
+    }
+    const { rowCount } = await pool.query(
+      `UPDATE "users" SET "MentorID" = $1 WHERE "id" = ANY($2::int[])`,
+      [newMentorID || null, studentIDs]
+    );
+    res.json({ message: 'Mentor reassigned.', updated: rowCount });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 router.delete('/:id', async (req, res) => {
   try {
+    const force = req.query.force === 'true';
+
+    // Block deletion while the user still mentors students, unless forced.
+    const mentees = await pool.query(
+      'SELECT COUNT(*)::int AS count FROM "users" WHERE "MentorID" = $1',
+      [req.params.id]
+    );
+    const menteeCount = mentees.rows[0]?.count || 0;
+    if (menteeCount > 0 && !force) {
+      return res.status(409).json({
+        error: `This user is a mentor to ${menteeCount} student(s). Reassign them before deleting.`,
+        menteeCount,
+      });
+    }
+
     const { rowCount } = await pool.query('DELETE FROM "users" WHERE "id" = $1', [req.params.id]);
     if (rowCount === 0) return res.status(404).json({ error: 'User not found' });
     res.status(204).send();

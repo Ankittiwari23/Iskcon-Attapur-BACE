@@ -1,8 +1,8 @@
-// src/pages/Enrollments.jsx
 import { useState, useEffect, useCallback } from 'react';
 import { api } from '../api';
 import { Spinner } from '../components/UI';
 import DataTable from '../components/DataTable';
+import MultiSelect from '../components/MultiSelect';
 
 const formatDate     = (d) => d ? new Date(d).toLocaleDateString('en-IN',  { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
 const formatDateTime = (d) => d ? new Date(d).toLocaleString('en-IN',      { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
@@ -43,7 +43,9 @@ export default function Enrollments() {
   const [modal, setModal]           = useState(null);
   const [generatedLink, setGeneratedLink] = useState(null);
   const [refreshKey, setRefreshKey] = useState(0);
-  const [form, setForm]             = useState({ ClassTypeID: '', SessionID: '', userID: '', EnrolledByUserID: '', StartDate: '', EndDate: '' });
+  const [form, setForm]             = useState({ ClassTypeID: '', SessionID: '', EnrolledByUserID: '', StartDate: '', EndDate: '' });
+  const [enrollSelected, setEnrollSelected] = useState(new Set());
+  const [pendingSelected, setPendingSelected] = useState(new Set());
 
   useEffect(() => {
     Promise.allSettled([api.classTypes.list(), api.classSessions.list(), api.users.list()])
@@ -55,7 +57,11 @@ export default function Enrollments() {
       .finally(() => setInitLoading(false));
   }, []);
 
-  const filterSession = (ctId) => sessions.filter(s => String(s.ClassTypeID) === String(ctId));
+  // Sessions for a class type, newest (highest SessionID) first
+  const filterSession = (ctId) =>
+    sessions
+      .filter(s => String(s.ClassTypeID) === String(ctId))
+      .sort((a, b) => b.SessionID - a.SessionID);
 
   const fetchEnrollments = useCallback((params) => {
     return api.sessionEnrollments.list(classTypeID, sessionID, null, params);
@@ -72,6 +78,7 @@ export default function Enrollments() {
   const applyFilter = () => {
     if (!classTypeID || !sessionID) { alert('Please select both a Class Type and a Session.'); return; }
     setHasLoaded(true);
+    setPendingSelected(new Set());
     setRefreshKey(k => k + 1);
   };
 
@@ -96,6 +103,39 @@ export default function Enrollments() {
     catch (e) { alert(e.message); }
   };
 
+  const togglePending = (id) => {
+    setPendingSelected(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const bulkApprove = async () => {
+    if (pendingSelected.size === 0) return;
+    setSaving(true);
+    try {
+      const res = await api.enrollmentInvites.bulkApprove([...pendingSelected]);
+      alert(`Approved ${res.approved} enrollment(s).`);
+      setPendingSelected(new Set());
+      setRefreshKey(k => k + 1);
+    } catch (e) { alert(e.message); }
+    finally { setSaving(false); }
+  };
+
+  const bulkReject = async () => {
+    if (pendingSelected.size === 0) return;
+    if (!confirm(`Discard ${pendingSelected.size} enrollment request(s)?`)) return;
+    setSaving(true);
+    try {
+      const res = await api.enrollmentInvites.bulkReject([...pendingSelected]);
+      alert(`Discarded ${res.rejected} request(s).`);
+      setPendingSelected(new Set());
+      setRefreshKey(k => k + 1);
+    } catch (e) { alert(e.message); }
+    finally { setSaving(false); }
+  };
+
   const approvePending = async (id) => {
     setSaving(true);
     try {
@@ -114,15 +154,26 @@ export default function Enrollments() {
 
   const openEnroll = () => {
     const ct = classTypeID || classTypes[0]?.id;
-    setForm({ ClassTypeID: ct, SessionID: (sessionID || filterSession(ct)[0]?.SessionID) ?? '', userID: '', EnrolledByUserID: '', StartDate: '', EndDate: '' });
+    setForm({ ClassTypeID: ct, SessionID: (sessionID || filterSession(ct)[0]?.SessionID) ?? '', EnrolledByUserID: '', StartDate: '', EndDate: '' });
+    setEnrollSelected(new Set());
     setModal('enroll');
   };
 
   const saveEnroll = async () => {
-    if (!form.userID) { alert('Please select a student.'); return; }
+    if (enrollSelected.size === 0) { alert('Please select at least one student.'); return; }
+    if (!form.ClassTypeID || !form.SessionID) { alert('Please select a Class Type and Session.'); return; }
     setSaving(true);
     try {
-      await api.sessionEnrollments.create({ ClassTypeID: form.ClassTypeID, SessionID: form.SessionID, userID: form.userID, EnrolledByUserID: form.EnrolledByUserID || null, StartDate: form.StartDate || null, EndDate: form.EndDate || null });
+      const res = await api.sessionEnrollments.bulkCreate({
+        ClassTypeID: form.ClassTypeID,
+        SessionID: form.SessionID,
+        userIDs: [...enrollSelected],
+        EnrolledByUserID: form.EnrolledByUserID || null,
+      });
+      const msg = res.skipped > 0
+        ? `Enrolled ${res.enrolled} student(s). ${res.skipped} were already enrolled.`
+        : `Enrolled ${res.enrolled} student(s).`;
+      alert(msg);
       setModal(null);
       setRefreshKey(k => k + 1);
     } catch (e) { alert(e.message); }
@@ -137,6 +188,8 @@ export default function Enrollments() {
 
   const selectedSession = sessions.find(s => String(s.ClassTypeID) === String(classTypeID) && String(s.SessionID) === String(sessionID));
 
+  const studentOptions = users.filter(u => u.Role === 'Students').map(u => ({ value: u.id, label: u.Name }));
+
   if (initLoading) return <p className="text-stone-500">Loading...</p>;
 
   return (
@@ -147,7 +200,7 @@ export default function Enrollments() {
 
       {/* Filter Bar */}
       <div className="mb-4 flex items-end gap-3 flex-wrap bg-white border border-amber-200 rounded-lg p-4">
-        <div className="min-w-[200px] max-w-xs">
+        <div className="min-w-[180px] flex-1 max-w-xs">
           <label className="block text-xs text-stone-500 mb-1">Class Type</label>
           <select className="w-full border rounded px-3 py-2 text-sm"
             value={classTypeID}
@@ -156,7 +209,7 @@ export default function Enrollments() {
             {classTypes.map(t => <option key={t.id} value={t.id}>{t.ClassType}</option>)}
           </select>
         </div>
-        <div className="min-w-[240px] max-w-sm">
+        <div className="min-w-[200px] flex-1 max-w-sm">
           <label className="block text-xs text-stone-500 mb-1">Session</label>
           <select className="w-full border rounded px-3 py-2 text-sm"
             value={sessionID} disabled={!classTypeID}
@@ -171,14 +224,14 @@ export default function Enrollments() {
           className="px-4 py-2 bg-amber-700 text-white rounded-lg text-sm hover:bg-amber-800">
           Load
         </button>
-        <div className="ml-auto flex gap-2 flex-wrap">
+        <div className="sm:ml-auto flex gap-2 flex-wrap">
           <button onClick={generateLink} disabled={!classTypeID || !sessionID || saving}
             className="px-4 py-2 border-2 border-amber-700 text-amber-700 rounded-lg text-sm hover:bg-amber-50 disabled:opacity-40 flex items-center gap-2">
             {saving ? <Spinner className="text-amber-700" /> : '🔗'} Generate Enrollment Link
           </button>
           <button onClick={openEnroll} disabled={!classTypeID || !sessionID}
             className="px-4 py-2 bg-amber-700 text-white rounded-lg hover:bg-amber-800 disabled:opacity-40 text-sm">
-            + Enroll Student
+            + Enroll Students
           </button>
         </div>
       </div>
@@ -200,14 +253,14 @@ export default function Enrollments() {
       ) : (
         <>
           {/* Tabs */}
-          <div className="flex gap-1 mb-4 border-b border-amber-200">
+          <div className="flex gap-1 mb-4 border-b border-amber-200 overflow-x-auto">
             {[
               { id: 'enrollments', label: 'Enrollments' },
               { id: 'pending',     label: 'Pending Approval' },
               { id: 'links',       label: 'Invite Links' },
             ].map(t => (
               <button key={t.id} onClick={() => setTab(t.id)}
-                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
                   tab === t.id ? 'border-amber-700 text-amber-800' : 'border-transparent text-stone-500 hover:text-stone-700'
                 }`}>
                 {t.label}
@@ -238,32 +291,58 @@ export default function Enrollments() {
 
           {/* ── Pending Approvals Tab ── */}
           {tab === 'pending' && (
-            <DataTable
-              fetchData={fetchPending}
-              refreshKey={refreshKey}
-              emptyMessage="No pending approvals."
-              columns={[
-                { key: 'Name', label: 'Name', sortable: true, filterable: true, cellClass: 'font-medium' },
-                { key: 'Email', label: 'Email', sortable: true, filterable: true },
-                { key: 'Phone', label: 'Phone', filterable: true },
-                { key: 'Age', label: 'Age', sortable: true },
-                { key: 'createdAt', label: 'Submitted At', sortable: true, render: (v) => <span className="text-xs text-stone-500">{formatDateTime(v)}</span> },
-                { key: '_actions', label: 'Actions',
-                  render: (_, row) => (
-                    <div className="flex gap-2">
-                      <button onClick={(e) => { e.stopPropagation(); approvePending(row.id); }}
-                        className="px-3 py-1 bg-green-100 text-green-800 border border-green-300 rounded text-xs hover:bg-green-200">
-                        ✓ Approve
-                      </button>
-                      <button onClick={(e) => { e.stopPropagation(); rejectPending(row.id); }}
-                        className="px-3 py-1 bg-red-50 text-red-700 border border-red-200 rounded text-xs hover:bg-red-100">
-                        ✗ Reject
-                      </button>
-                    </div>
-                  ),
-                },
-              ]}
-            />
+            <>
+              {pendingSelected.size > 0 && (
+                <div className="mb-3 px-4 py-2.5 bg-amber-50 border border-amber-200 rounded-lg flex items-center gap-3 flex-wrap">
+                  <span className="text-sm text-amber-900 font-medium">{pendingSelected.size} selected</span>
+                  <button onClick={bulkApprove} disabled={saving}
+                    className="px-3 py-1.5 bg-green-100 text-green-800 border border-green-300 rounded text-xs hover:bg-green-200 disabled:opacity-40">
+                    ✓ Approve selected
+                  </button>
+                  <button onClick={bulkReject} disabled={saving}
+                    className="px-3 py-1.5 bg-red-50 text-red-700 border border-red-200 rounded text-xs hover:bg-red-100 disabled:opacity-40">
+                    ✗ Discard selected
+                  </button>
+                  <button onClick={() => setPendingSelected(new Set())}
+                    className="px-3 py-1.5 text-xs text-stone-500 hover:underline">
+                    Clear
+                  </button>
+                </div>
+              )}
+              <DataTable
+                fetchData={fetchPending}
+                refreshKey={refreshKey}
+                emptyMessage="No pending approvals."
+                columns={[
+                  { key: '_select', label: '',
+                    render: (_, row) => (
+                      <input type="checkbox" checked={pendingSelected.has(row.id)}
+                        onClick={(e) => e.stopPropagation()}
+                        onChange={(e) => { e.stopPropagation(); togglePending(row.id); }} />
+                    ),
+                  },
+                  { key: 'Name', label: 'Name', sortable: true, filterable: true, cellClass: 'font-medium' },
+                  { key: 'Email', label: 'Email', sortable: true, filterable: true },
+                  { key: 'Phone', label: 'Phone', filterable: true },
+                  { key: 'Age', label: 'Age', sortable: true },
+                  { key: 'createdAt', label: 'Submitted At', sortable: true, render: (v) => <span className="text-xs text-stone-500">{formatDateTime(v)}</span> },
+                  { key: '_actions', label: 'Actions',
+                    render: (_, row) => (
+                      <div className="flex gap-2">
+                        <button onClick={(e) => { e.stopPropagation(); approvePending(row.id); }}
+                          className="px-3 py-1 bg-green-100 text-green-800 border border-green-300 rounded text-xs hover:bg-green-200">
+                          ✓ Approve
+                        </button>
+                        <button onClick={(e) => { e.stopPropagation(); rejectPending(row.id); }}
+                          className="px-3 py-1 bg-red-50 text-red-700 border border-red-200 rounded text-xs hover:bg-red-100">
+                          ✗ Reject
+                        </button>
+                      </div>
+                    ),
+                  },
+                ]}
+              />
+            </>
           )}
 
           {/* ── Invite Links Tab ── */}
@@ -309,8 +388,8 @@ export default function Enrollments() {
 
       {/* ── Modal: Link + QR ── */}
       {modal === 'link' && generatedLink && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-10" onClick={() => setModal(null)}>
-          <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-10 p-4" onClick={() => setModal(null)}>
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-lg font-semibold mb-1">🔗 Enrollment Link Generated</h2>
             <p className="text-sm text-stone-500 mb-4">Share with students. Multiple students can use this link within 24 hours.</p>
             <div className="bg-amber-50 rounded-lg px-4 py-3 mb-4 text-sm">
@@ -331,11 +410,11 @@ export default function Enrollments() {
         </div>
       )}
 
-      {/* ── Modal: Enroll Existing Student ── */}
+      {/* ── Modal: Enroll Existing Students (multi) ── */}
       {modal === 'enroll' && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-10" onClick={() => setModal(null)}>
-          <div className="bg-white rounded-xl p-6 w-full max-w-md shadow-xl" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-lg font-semibold mb-4">Enroll Existing Student</h2>
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-10 p-4" onClick={() => setModal(null)}>
+          <div className="bg-white rounded-xl p-6 w-full max-w-md shadow-xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-lg font-semibold mb-4">Enroll Students</h2>
             <label className="block mb-3">
               <span className="text-sm text-stone-600">Class Type</span>
               <select className="mt-1 w-full border rounded px-3 py-2" value={form.ClassTypeID}
@@ -353,17 +432,19 @@ export default function Enrollments() {
                 ))}
               </select>
             </label>
-            <label className="block mb-3">
-              <span className="text-sm text-stone-600">Student</span>
-              <select className="mt-1 w-full border rounded px-3 py-2" value={form.userID}
-                onChange={(e) => setForm({ ...form, userID: e.target.value })}>
-                <option value="">— Select Student —</option>
-                {users.filter(u => u.Role === 'Students').map(u => (
-                  <option key={u.id} value={u.id}>{u.Name}</option>
-                ))}
-              </select>
-            </label>
-            <label className="block mb-3">
+            <div className="block mb-3">
+              <span className="text-sm text-stone-600">Students <span className="text-stone-400 text-xs">(select one or more)</span></span>
+              <div className="mt-1">
+                <MultiSelect
+                  options={studentOptions}
+                  selected={enrollSelected}
+                  onChange={setEnrollSelected}
+                  placeholder="Search students…"
+                  emptyMessage="No students found."
+                />
+              </div>
+            </div>
+            <label className="block mb-4">
               <span className="text-sm text-stone-600">Enrolled By</span>
               <select className="mt-1 w-full border rounded px-3 py-2" value={form.EnrolledByUserID}
                 onChange={(e) => setForm({ ...form, EnrolledByUserID: e.target.value })}>
@@ -373,24 +454,12 @@ export default function Enrollments() {
                 ))}
               </select>
             </label>
-            <div className="grid grid-cols-2 gap-3 mb-4">
-              <label className="block">
-                <span className="text-sm text-stone-600">Start Date</span>
-                <input type="date" className="mt-1 w-full border rounded px-3 py-2"
-                  value={form.StartDate} onChange={(e) => setForm({ ...form, StartDate: e.target.value })} />
-              </label>
-              <label className="block">
-                <span className="text-sm text-stone-600">End Date</span>
-                <input type="date" className="mt-1 w-full border rounded px-3 py-2"
-                  value={form.EndDate} onChange={(e) => setForm({ ...form, EndDate: e.target.value })} />
-              </label>
-            </div>
             <div className="flex justify-end gap-2">
               <button onClick={() => setModal(null)} className="px-4 py-2 border rounded-lg text-sm">Cancel</button>
               <button onClick={saveEnroll} disabled={saving}
                 className="px-4 py-2 bg-amber-700 text-white rounded-lg text-sm disabled:opacity-50 flex items-center gap-2">
                 {saving && <Spinner className="text-white" />}
-                {saving ? 'Saving...' : 'Enroll'}
+                {saving ? 'Saving...' : `Enroll ${enrollSelected.size || ''}`}
               </button>
             </div>
           </div>

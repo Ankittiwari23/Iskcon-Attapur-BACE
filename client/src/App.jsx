@@ -1,4 +1,3 @@
-
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Layout            from './Layout';
@@ -7,7 +6,6 @@ import EnrollPublicForm  from './pages/EnrollPublicForm';
 import Dashboard         from './pages/Dashboard';
 import Users             from './pages/Users';
 import MemberTypes       from './pages/MemberTypes';
-import WebsiteRoles      from './pages/WebsiteRoles';
 import ClassTypes        from './pages/ClassTypes';
 import ClassSessions     from './pages/ClassSessions';
 import Classes           from './pages/Classes';
@@ -51,7 +49,6 @@ function AppRoutes() {
         <Route index                 element={<Dashboard />} />
         <Route path="users"          element={<RoleRoute roles={['Admin']}><Users /></RoleRoute>} />
         <Route path="member-types"   element={<RoleRoute roles={['Admin']}><MemberTypes /></RoleRoute>} />
-        <Route path="website-roles"  element={<RoleRoute roles={['Admin']}><WebsiteRoles /></RoleRoute>} />
         <Route path="class-types"    element={<RoleRoute roles={['Admin', 'Managers']}><ClassTypes /></RoleRoute>} />
         <Route path="class-sessions" element={<RoleRoute roles={['Admin', 'Managers']}><ClassSessions /></RoleRoute>} />
         <Route path="classes"        element={<RoleRoute roles={['Admin', 'Managers']}><Classes /></RoleRoute>} />

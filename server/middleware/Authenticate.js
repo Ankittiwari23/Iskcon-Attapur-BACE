@@ -1,6 +1,3 @@
-// middleware/authenticate.js
-// Use this middleware on any route that requires login
-
 import jwt from 'jsonwebtoken';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'change-this-secret-in-production';
@@ -30,17 +27,6 @@ export function requireRole(...roles) {
     if (!req.user) return res.status(401).json({ error: 'Not authenticated.' });
     if (!roles.includes(req.user.role)) {
       return res.status(403).json({ error: 'You do not have permission for this action.' });
-    }
-    next();
-  };
-}
-
-// ── Require specific WebsiteRole permission ───────────────────
-export function requirePermission(permission) {
-  return (req, res, next) => {
-    if (!req.user) return res.status(401).json({ error: 'Not authenticated.' });
-    if (!req.user.permissions?.[permission]) {
-      return res.status(403).json({ error: `Permission denied: ${permission}` });
     }
     next();
   };

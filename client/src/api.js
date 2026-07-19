@@ -1,4 +1,3 @@
-// src/api.js
 const BASE = '/api';
 const TOKEN_KEY = 'iskcon_token';
 
@@ -59,20 +58,16 @@ export const api = {
     detail:      (id)        => request(`/users/${id}/detail`),
     create:      (body)      => request('/users', { method: 'POST', body: JSON.stringify(body) }),
     update:      (id, body)  => request(`/users/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
-    delete:      (id)        => request(`/users/${id}`, { method: 'DELETE' }),
+    delete:      (id, force) => request(`/users/${id}${force ? '?force=true' : ''}`, { method: 'DELETE' }),
     setPassword: (id, body)  => request(`/users/${id}/set-password`, { method: 'PUT', body: JSON.stringify(body) }),
+    mentees:     (id)        => request(`/users/${id}/mentees`),
+    reassignMentor: (body)   => request('/users/reassign-mentor', { method: 'POST', body: JSON.stringify(body) }),
   },
   memberTypes: {
     list:   (params)   => params?.page ? request(appendPaginationParams('/member-types', params)) : request('/member-types'),
     create: (body)     => request('/member-types', { method: 'POST', body: JSON.stringify(body) }),
     update: (id, body) => request(`/member-types/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
     delete: (id)       => request(`/member-types/${id}`, { method: 'DELETE' }),
-  },
-  websiteRoles: {
-    list:   (params)   => params?.page ? request(appendPaginationParams('/website-roles', params)) : request('/website-roles'),
-    create: (body)     => request('/website-roles', { method: 'POST', body: JSON.stringify(body) }),
-    update: (id, body) => request(`/website-roles/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
-    delete: (id)       => request(`/website-roles/${id}`, { method: 'DELETE' }),
   },
   iskconRoles: {
     list:   ()         => request('/iskcon-roles'),
@@ -117,6 +112,7 @@ export const api = {
       return params?.page ? request(appendPaginationParams(base, params)) : request(base);
     },
     create: (body) => request('/session-enrollments', { method: 'POST', body: JSON.stringify(body) }),
+    bulkCreate: (body) => request('/session-enrollments/bulk', { method: 'POST', body: JSON.stringify(body) }),
     delete: (id)   => request(`/session-enrollments/${id}`, { method: 'DELETE' }),
   },
   classAttendance: {
@@ -181,5 +177,7 @@ export const api = {
     delete: (id)   => request(`/enrollment-invites/${id}`, { method: 'DELETE' }),
     approveEnrollment: (id) => request(`/enrollment-invites/pending/${id}/approve`, { method: 'POST' }),
     rejectEnrollment:  (id) => request(`/enrollment-invites/pending/${id}/reject`, { method: 'POST' }),
+    bulkApprove: (ids) => request('/enrollment-invites/pending/bulk-approve', { method: 'POST', body: JSON.stringify({ ids }) }),
+    bulkReject:  (ids) => request('/enrollment-invites/pending/bulk-reject', { method: 'POST', body: JSON.stringify({ ids }) }),
   },
 };

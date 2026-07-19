@@ -1,4 +1,3 @@
-// routes/enrollmentInvites.js
 import { Router } from 'express';
 import crypto from 'crypto';
 import pool from '../db/pool.js';
@@ -6,6 +5,89 @@ import { authenticate, requireRole } from '../middleware/Authenticate.js';
 import { paginatedQuery } from '../db/queryHelper.js';
 
 const router = Router();
+
+// Approve a single pending enrollment within an existing transaction.
+// Creates/links the user, enrolls them, and seeds signal + follow-up rows.
+// Returns { status: 'approved' | 'skipped' }.
+async function approvePendingTx(client, pendingId, reviewer) {
+  const { rows: pending } = await client.query(
+    `SELECT * FROM "PendingEnrollments" WHERE "id" = $1 AND "Status" = 'pending'`,
+    [pendingId]
+  );
+  if (pending.length === 0) return { status: 'skipped' };
+  const p = pending[0];
+
+  const mentorID = reviewer.role === 'Managers' ? reviewer.id : null;
+
+  let userID;
+  const existingUser = await client.query(
+    `SELECT "id" FROM "users" WHERE LOWER("Email") = LOWER($1)`,
+    [p.Email]
+  );
+  if (existingUser.rows.length > 0) {
+    userID = existingUser.rows[0].id;
+    if (mentorID) {
+      await client.query(
+        'UPDATE "users" SET "MentorID" = $2 WHERE "id" = $1 AND "MentorID" IS NULL',
+        [userID, mentorID]
+      );
+    }
+  } else {
+    const { rows: newUser } = await client.query(
+      `INSERT INTO "users"
+         ("Name", "Role", "Email", "Phone", "isActive", "JoinedDate", "enrolledBY", "MentorID")
+       VALUES ($1, 'Students', $2, $3, true, CURRENT_DATE, $4, $5)
+       RETURNING "id"`,
+      [p.Name, p.Email, p.Phone, reviewer.id, mentorID]
+    );
+    userID = newUser[0].id;
+  }
+
+  const alreadyEnrolled = await client.query(
+    `SELECT "id" FROM "SessionEnrollments"
+     WHERE "ClassTypeID" = $1 AND "SessionID" = $2 AND "userID" = $3`,
+    [p.ClassTypeID, p.SessionID, userID]
+  );
+
+  if (alreadyEnrolled.rows.length === 0) {
+    await client.query(
+      `INSERT INTO "SessionEnrollments"
+         ("ClassTypeID", "SessionID", "userID", "EnrolledByUserID", "StartDate")
+       VALUES ($1, $2, $3, $4, CURRENT_DATE)`,
+      [p.ClassTypeID, p.SessionID, userID, reviewer.id]
+    );
+    await client.query(
+      `UPDATE "ClassSessions" SET "TotalEnrolled" = "TotalEnrolled" + 1
+       WHERE "ClassTypeID" = $1 AND "SessionID" = $2`,
+      [p.ClassTypeID, p.SessionID]
+    );
+    await client.query(
+      `INSERT INTO "UserSignals" ("UserID", "Signal", "IsInFollowUpList")
+       VALUES ($1, 'green', true)
+       ON CONFLICT ("UserID") DO NOTHING`,
+      [userID]
+    );
+    const studentMentorRes = await client.query('SELECT "MentorID" FROM "users" WHERE "id" = $1', [userID]);
+    const studentMentorID = studentMentorRes.rows[0]?.MentorID || null;
+    await client.query(
+      `INSERT INTO "FollowUps" ("ClassID", "ClassTypeID", "SessionID", "StudentID", "MentorID")
+       SELECT c."id", $1, $2, $3, $4
+       FROM "Classes" c
+       WHERE c."ClassTypeID" = $1 AND c."SessionID" = $2
+       ON CONFLICT ("ClassID", "StudentID") DO NOTHING`,
+      [p.ClassTypeID, p.SessionID, userID, studentMentorID]
+    );
+  }
+
+  await client.query(
+    `UPDATE "PendingEnrollments"
+     SET "Status" = 'approved', "ReviewedByID" = $2, "ReviewedAt" = NOW(), "UserID" = $3
+     WHERE "id" = $1`,
+    [p.id, reviewer.id, userID]
+  );
+
+  return { status: 'approved', userID };
+}
 
 // ── POST /api/enrollment-invites
 // Generate a new invite link for a session (Admin/Manager only)
@@ -253,100 +335,37 @@ router.post('/pending/:id/approve', authenticate, requireRole('Admin', 'Managers
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-
-    // Get pending record
-    const { rows: pending } = await client.query(
-      `SELECT * FROM "PendingEnrollments" WHERE "id" = $1 AND "Status" = 'pending'`,
-      [req.params.id]
-    );
-    if (pending.length === 0) {
+    const result = await approvePendingTx(client, req.params.id, req.user);
+    if (result.status === 'skipped') {
       await client.query('ROLLBACK');
       return res.status(404).json({ error: 'Pending enrollment not found or already reviewed.' });
     }
-
-    const p = pending[0];
-
-    // Check if user with this email already exists
-    let userID;
-    const existingUser = await client.query(
-      `SELECT "id" FROM "users" WHERE LOWER("Email") = LOWER($1)`,
-      [p.Email]
-    );
-
-    const mentorID = req.user.role === 'Managers' ? req.user.id : null;
-
-    if (existingUser.rows.length > 0) {
-      userID = existingUser.rows[0].id;
-      if (mentorID) {
-        await client.query(
-          'UPDATE "users" SET "MentorID" = $2 WHERE "id" = $1 AND "MentorID" IS NULL',
-          [userID, mentorID]
-        );
-      }
-    } else {
-      const { rows: newUser } = await client.query(
-        `INSERT INTO "users"
-           ("Name", "Role", "Email", "Phone", "isActive", "JoinedDate", "enrolledBY", "MentorID")
-         VALUES ($1, 'Students', $2, $3, true, CURRENT_DATE, $4, $5)
-         RETURNING "id"`,
-        [p.Name, p.Email, p.Phone, req.user.id, mentorID]
-      );
-      userID = newUser[0].id;
-    }
-
-    // Check not already enrolled
-    const alreadyEnrolled = await client.query(
-      `SELECT "id" FROM "SessionEnrollments"
-       WHERE "ClassTypeID" = $1 AND "SessionID" = $2 AND "userID" = $3`,
-      [p.ClassTypeID, p.SessionID, userID]
-    );
-
-    if (alreadyEnrolled.rows.length === 0) {
-      await client.query(
-        `INSERT INTO "SessionEnrollments"
-           ("ClassTypeID", "SessionID", "userID", "EnrolledByUserID", "StartDate")
-         VALUES ($1, $2, $3, $4, CURRENT_DATE)`,
-        [p.ClassTypeID, p.SessionID, userID, req.user.id]
-      );
-
-      await client.query(
-        `UPDATE "ClassSessions" SET "TotalEnrolled" = "TotalEnrolled" + 1
-         WHERE "ClassTypeID" = $1 AND "SessionID" = $2`,
-        [p.ClassTypeID, p.SessionID]
-      );
-
-      await client.query(
-        `INSERT INTO "UserSignals" ("UserID", "Signal", "IsInFollowUpList")
-         VALUES ($1, 'green', true)
-         ON CONFLICT ("UserID") DO NOTHING`,
-        [userID]
-      );
-
-      const studentMentorRes = await client.query(
-        'SELECT "MentorID" FROM "users" WHERE "id" = $1', [userID]
-      );
-      const studentMentorID = studentMentorRes.rows[0]?.MentorID || null;
-
-      await client.query(
-        `INSERT INTO "FollowUps" ("ClassID", "ClassTypeID", "SessionID", "StudentID", "MentorID")
-         SELECT c."id", $1, $2, $3, $4
-         FROM "Classes" c
-         WHERE c."ClassTypeID" = $1 AND c."SessionID" = $2
-         ON CONFLICT ("ClassID", "StudentID") DO NOTHING`,
-        [p.ClassTypeID, p.SessionID, userID, studentMentorID]
-      );
-    }
-
-    await client.query(
-      `UPDATE "PendingEnrollments"
-       SET "Status" = 'approved', "ReviewedByID" = $2,
-           "ReviewedAt" = NOW(), "UserID" = $3
-       WHERE "id" = $1`,
-      [p.id, req.user.id, userID]
-    );
-
     await client.query('COMMIT');
-    res.json({ message: 'Enrollment approved.', userID });
+    res.json({ message: 'Enrollment approved.', userID: result.userID });
+  } catch (e) {
+    await client.query('ROLLBACK');
+    res.status(500).json({ error: e.message });
+  } finally {
+    client.release();
+  }
+});
+
+// ── POST /api/enrollment-invites/pending/bulk-approve
+router.post('/pending/bulk-approve', authenticate, requireRole('Admin', 'Managers'), async (req, res) => {
+  const { ids } = req.body;
+  if (!Array.isArray(ids) || ids.length === 0) {
+    return res.status(400).json({ error: 'ids array is required.' });
+  }
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    let approved = 0;
+    for (const id of ids) {
+      const r = await approvePendingTx(client, id, req.user);
+      if (r.status === 'approved') approved++;
+    }
+    await client.query('COMMIT');
+    res.json({ message: 'Bulk approval complete.', approved, skipped: ids.length - approved });
   } catch (e) {
     await client.query('ROLLBACK');
     res.status(500).json({ error: e.message });
@@ -369,6 +388,25 @@ router.post('/pending/:id/reject', authenticate, requireRole('Admin', 'Managers'
       return res.status(404).json({ error: 'Not found or already reviewed.' });
     }
     res.json({ message: 'Enrollment rejected.' });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ── POST /api/enrollment-invites/pending/bulk-reject
+router.post('/pending/bulk-reject', authenticate, requireRole('Admin', 'Managers'), async (req, res) => {
+  const { ids } = req.body;
+  if (!Array.isArray(ids) || ids.length === 0) {
+    return res.status(400).json({ error: 'ids array is required.' });
+  }
+  try {
+    const { rowCount } = await pool.query(
+      `UPDATE "PendingEnrollments"
+       SET "Status" = 'rejected', "ReviewedByID" = $2, "ReviewedAt" = NOW()
+       WHERE "id" = ANY($1::int[]) AND "Status" = 'pending'`,
+      [ids, req.user.id]
+    );
+    res.json({ message: 'Bulk rejection complete.', rejected: rowCount });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

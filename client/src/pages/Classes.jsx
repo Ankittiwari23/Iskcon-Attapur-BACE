@@ -26,7 +26,9 @@ export default function Classes() {
       .catch(console.error);
   }, []);
 
-  const filterSession = (ctId) => sessions.filter((s) => String(s.ClassTypeID) === String(ctId));
+  const filterSession = (ctId) => sessions
+    .filter((s) => String(s.ClassTypeID) === String(ctId))
+    .sort((a, b) => b.SessionID - a.SessionID);
 
   const fetchData = useCallback((params) => {
     return api.classes.list(classTypeID, sessionID, params);
