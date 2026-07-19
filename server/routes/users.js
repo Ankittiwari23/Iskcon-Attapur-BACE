@@ -36,7 +36,7 @@ router.get('/', async (req, res) => {
     const withSignals = await checkUserSignals(pool);
     const base = getUsersBase(withSignals);
     const paginated = await paginatedQuery(pool, base, [], {
-      searchColumns: ['Name', 'Email', 'Phone', 'Role', 'MemberTypeName', 'WebsiteRoleName'],
+      searchColumns: ['Name', 'Email', 'Phone', 'Role', 'MemberTypeName'],
       req,
     });
     if (paginated) return res.json(paginated);
@@ -148,6 +148,16 @@ router.put('/:id', async (req, res) => {
        isActive, MemberTypeID, enrolledBY, MentorID]
     );
     if (rows.length === 0) return res.status(404).json({ error: 'User not found' });
+
+    // Keep this student's follow-up rows pointing at their current mentor,
+    // so reassigning a mentor here reflects in the mentor's Follow-Ups view.
+    try {
+      await pool.query(
+        'UPDATE "FollowUps" SET "MentorID" = $2 WHERE "StudentID" = $1',
+        [req.params.id, rows[0].MentorID]
+      );
+    } catch { /* FollowUps table optional; ignore if absent */ }
+
     const { PasswordHash: _, ...safeUser } = rows[0];
     res.json(safeUser);
   } catch (e) {
@@ -202,6 +212,15 @@ router.post('/reassign-mentor', requireRole('Admin'), async (req, res) => {
       `UPDATE "users" SET "MentorID" = $1 WHERE "id" = ANY($2::int[])`,
       [newMentorID || null, studentIDs]
     );
+
+    // Keep their follow-up rows in sync with the new mentor.
+    try {
+      await pool.query(
+        `UPDATE "FollowUps" SET "MentorID" = $1 WHERE "StudentID" = ANY($2::int[])`,
+        [newMentorID || null, studentIDs]
+      );
+    } catch { /* FollowUps table optional; ignore if absent */ }
+
     res.json({ message: 'Mentor reassigned.', updated: rowCount });
   } catch (e) {
     res.status(500).json({ error: e.message });
